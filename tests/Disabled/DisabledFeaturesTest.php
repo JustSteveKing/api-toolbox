@@ -86,7 +86,15 @@ it('registers no testing macros for disabled features', function (string $macro)
     'assertETag', 'assertNotModified', 'assertPreconditionFailed', 'assertPreconditionRequired',
     'assertIdempotentReplay', 'assertRateLimitHeaders', 'assertTraceparent', 'assertRequestId',
     'assertCacheControl', 'assertPreferenceApplied', 'assertPreferenceNotApplied', 'assertOperationAccepted',
+    'assertContentDigest', 'assertReprDigest', 'assertAcceptsPatch',
 ]);
+
+it('registers no merge patch or digest aliases or bindings', function (): void {
+    expect(app()->getProviders(JustSteveKing\Toolbox\MergePatch\MergePatchServiceProvider::class))->toBe([])
+        ->and(app()->getProviders(JustSteveKing\Toolbox\Digest\DigestServiceProvider::class))->toBe([])
+        ->and(app()->bound(JustSteveKing\Toolbox\MergePatch\MergePatch::class))->toBeFalse()
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKeys(['merge-patch', 'digest.verify', 'digest.respond']);
+});
 
 it('registers no preferences alias or bindings', function (): void {
     expect(app()->getProviders(JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider::class))->toBe([])

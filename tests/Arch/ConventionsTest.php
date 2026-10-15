@@ -36,6 +36,8 @@ $features = [
     'JustSteveKing\Toolbox\Negotiation',
     'JustSteveKing\Toolbox\Preferences',
     'JustSteveKing\Toolbox\AsyncOperations',
+    'JustSteveKing\Toolbox\MergePatch',
+    'JustSteveKing\Toolbox\Digest',
 ];
 
 foreach ($features as $feature) {

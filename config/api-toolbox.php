@@ -22,5 +22,7 @@ return [
         Features::negotiation(),
         Features::preferences(),
         Features::asyncOperations(),
+        Features::mergePatch(),
+        Features::digests(),
     ],
 ];

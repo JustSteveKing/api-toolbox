@@ -221,6 +221,27 @@ describe('cache-control and preference assertions', function (): void {
     ])->throws(AssertionFailedError::class);
 });
 
+describe('digest assertions', function (): void {
+    it('accept digests that match the content', function (): void {
+        $digest = 'sha-256=:'.base64_encode(hash('sha256', 'hello', true)).':, md5=:XUFAKrxLKna5cZ2REBfFkg==:';
+
+        fakeResponse('hello', headers: ['Content-Digest' => $digest, 'Repr-Digest' => $digest, 'Accept-Patch' => 'application/merge-patch+json; charset=utf-8'])
+            ->assertContentDigest()
+            ->assertReprDigest()
+            ->assertAcceptsPatch();
+    });
+
+    it('reject', function (Closure $assert): void {
+        $assert();
+    })->with([
+        'no digest' => fn () => fakeResponse('hello')->assertContentDigest(),
+        'mismatch' => fn () => fakeResponse('hello', headers: ['Repr-Digest' => 'sha-256=:'.base64_encode(hash('sha256', 'bye', true)).':'])->assertReprDigest(),
+        'not a byte sequence' => fn () => fakeResponse('hello', headers: ['Content-Digest' => 'sha-256="abc"'])->assertContentDigest(),
+        'nothing checkable' => fn () => fakeResponse('hello', headers: ['Content-Digest' => 'md5=:XUFAKrxLKna5cZ2REBfFkg==:'])->assertContentDigest(),
+        'no Accept-Patch' => fn () => fakeResponse()->assertAcceptsPatch(),
+    ])->throws(AssertionFailedError::class);
+});
+
 describe('Pest expectations', function (): void {
     it('mirror the macros', function (): void {
         expect(fakeProblem(['type' => 'https://example.com/a', 'status' => 403]))

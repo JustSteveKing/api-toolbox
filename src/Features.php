@@ -40,6 +40,10 @@ final class Features
 
     public const string ASYNC_OPERATIONS = 'async-operations';
 
+    public const string MERGE_PATCH = 'merge-patch';
+
+    public const string DIGESTS = 'digests';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -167,6 +171,28 @@ final class Features
     }
 
     /**
+     * JSON Merge Patch documents for PATCH, through the "merge-patch" middleware and an injectable
+     * MergePatch.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc7396
+     */
+    public static function mergePatch(): string
+    {
+        return self::MERGE_PATCH;
+    }
+
+    /**
+     * Content-Digest and Repr-Digest: verified on requests with "digest.verify", added to
+     * responses with "digest.respond".
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9530
+     */
+    public static function digests(): string
+    {
+        return self::DIGESTS;
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -183,6 +209,8 @@ final class Features
             self::NEGOTIATION,
             self::PREFERENCES,
             self::ASYNC_OPERATIONS,
+            self::MERGE_PATCH,
+            self::DIGESTS,
         ];
     }
 

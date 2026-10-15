@@ -13,6 +13,7 @@ use JustSteveKing\Toolbox\Features;
 use JustSteveKing\Toolbox\Testing\Assertions\CacheControlAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
+use JustSteveKing\Toolbox\Testing\Assertions\DigestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\IdempotencyAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\LinkAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\NegotiationAssertions;
@@ -53,6 +54,10 @@ final class TestingServiceProvider extends ServiceProvider
 
         if ($features->enabled(Features::PREFERENCES) || $features->enabled(Features::ASYNC_OPERATIONS)) {
             self::preferences();
+        }
+
+        if ($features->enabled(Features::DIGESTS) || $features->enabled(Features::MERGE_PATCH)) {
+            self::digests();
         }
 
         if ($features->enabled(Features::IDEMPOTENCY)) {
@@ -173,6 +178,30 @@ final class TestingServiceProvider extends ServiceProvider
         });
 
         self::expectation('toHavePreferenceApplied', static fn (TestResponse $response, string $preference, ?string $value = null) => PreferenceAssertions::assertPreferenceApplied($response, $preference, $value));
+    }
+
+    private static function digests(): void
+    {
+        TestResponse::macro('assertContentDigest', function (): TestResponse {
+            DigestAssertions::assertContentDigest($this);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertReprDigest', function (): TestResponse {
+            DigestAssertions::assertReprDigest($this);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertAcceptsPatch', function (string $mediaType = 'application/merge-patch+json'): TestResponse {
+            DigestAssertions::assertAcceptsPatch($this, $mediaType);
+
+            return $this;
+        });
+
+        self::expectation('toHaveContentDigest', static fn (TestResponse $response) => DigestAssertions::assertContentDigest($response));
+        self::expectation('toHaveReprDigest', static fn (TestResponse $response) => DigestAssertions::assertReprDigest($response));
     }
 
     private static function idempotency(EnabledFeatures $features): void

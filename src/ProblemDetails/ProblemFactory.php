@@ -6,6 +6,7 @@ namespace JustSteveKing\Toolbox\ProblemDetails;
 
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
+use JustSteveKing\Toolbox\Contracts\HasProblemExtensions;
 use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
 use JustSteveKing\Toolbox\Support\ApiGuide;
@@ -50,6 +51,7 @@ final readonly class ProblemFactory
                 type: $this->types->resolve($e->problemType()),
                 title: $e->problemTitle(),
                 detail: $this->message($e),
+                extensions: $e instanceof HasProblemExtensions ? $e->problemExtensions() : [],
             ),
             $e instanceof HttpExceptionInterface => $this->forStatus($e->getStatusCode(), $this->message($e)),
             default => $this->fromUnexpected($e),

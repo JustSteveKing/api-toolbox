@@ -18,6 +18,8 @@ Requires PHP 8.3 and Laravel 13.30 or later.
 | [RateLimit headers](#ratelimit-headers-experimental) | [draft-ietf-httpapi-ratelimit-headers-11](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) | Experimental |
 | [Preferences](#preferences) | [RFC 7240](https://www.rfc-editor.org/rfc/rfc7240) | Stable |
 | [Async operations](#async-operations) | [RFC 9110 §15.3.3](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3), [RFC 7240 §4.1](https://www.rfc-editor.org/rfc/rfc7240#section-4.1); the status monitor is this package's own | Stable |
+| [Merge Patch](#merge-patch) | [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396) | Stable |
+| [Digest Fields](#digest-fields) | [RFC 9530](https://www.rfc-editor.org/rfc/rfc9530); problem types from [draft-ietf-httpapi-digest-fields-problem-types-06](https://datatracker.ietf.org/doc/draft-ietf-httpapi-digest-fields-problem-types/) | Stable |
 | [Negotiation](#negotiation) | [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12), [W3C Trace Context](https://www.w3.org/TR/trace-context/); request IDs have no standard | Stable |
 | [Testing](#testing) | Assertions for each of the above | Stable |
 
@@ -51,6 +53,8 @@ use JustSteveKing\Toolbox\Features;
     Features::negotiation(),
     Features::preferences(),
     Features::asyncOperations(),
+    Features::mergePatch(),
+    Features::digests(),
     // Features::rateLimitHeaders(),
 ],
 ```
@@ -789,6 +793,118 @@ public function handle(CurrentOperation $operation): void
   can lose a status early; the monitor then answers 404.
 - A job that times out or is failed manually, without throwing, stays `running` until its TTL.
 
+## Merge Patch
+
+[RFC 7396](https://www.rfc-editor.org/rfc/rfc7396)
+
+Most Laravel APIs treat PATCH as a partial PUT: send the fields to change, and hope nobody needs to
+clear one. JSON Merge Patch gives PATCH exact rules: a member present changes, a member set to
+`null` is removed, and a member absent is left alone, all the way down nested objects.
+
+```php
+Features::mergePatch(),
+```
+
+```php
+use JustSteveKing\Toolbox\MergePatch\MergePatch;
+
+Route::patch('posts/{post}', function (Post $post, MergePatch $patch) {
+    $document = $patch->applyTo($post->only(['title', 'summary', 'tags']));
+
+    Validator::make($document, [
+        'title' => ['required', 'string'],
+        'summary' => ['nullable', 'string'],
+        'tags' => ['array'],
+    ])->validate();
+
+    $post->update($patch->changesTo($post->only(['title', 'summary', 'tags'])));
+
+    return new PostResource($post);
+})->middleware('merge-patch');
+```
+
+```http
+PATCH /posts/1 HTTP/1.1
+Content-Type: application/merge-patch+json
+
+{"title":"Hello!","summary":null,"tags":["example"]}
+```
+
+- **Validate the merged document, not the patch.** In a patch, `null` means "remove", so rules
+  written for the resource would misread it. What has to be valid is the result.
+- `applyTo()` returns the merged document. `changesTo()` returns only the members the patch
+  touches, with removed ones as `null`, which is what `Model::update()` wants.
+- `apply()` is the section 2 algorithm on any decoded JSON value, for documents that are not arrays
+  of attributes.
+- **`{}` and `[]` are different.** The patch `{}` changes nothing; the patch `[]` replaces the
+  whole document. PHP's usual `json_decode($json, true)` turns both into `[]`, so the patch is read
+  from the raw body with objects kept as objects. The package's own tests are Appendix A's.
+- The `merge-patch` middleware answers a PATCH in any other format with 415 and
+  `Accept-Patch: application/merge-patch+json`, as RFC 5789 section 2.2 asks, and advertises the
+  format on every response. A patch that is not JSON is a 400, typed
+  `https://apiguide.dev/errors/malformed-request-body`.
+- JSON Patch (RFC 6902) is not supported. It is a different, operation-based format, and few APIs
+  need it.
+
+## Digest Fields
+
+[RFC 9530](https://www.rfc-editor.org/rfc/rfc9530)
+
+TLS protects a message in transit, not the content an intermediary decompressed, re-encoded or cut
+short. `Content-Digest` and `Repr-Digest` carry a hash of the content, so either side can check it
+arrived intact.
+
+```php
+Features::digests(),
+```
+
+```php
+Route::put('files/{file}', StoreFile::class)->middleware('digest.verify');           // check when sent
+Route::put('ledger/{entry}', StoreEntry::class)->middleware('digest.verify:required'); // and require one
+Route::get('files/{file}', ShowFile::class)->middleware('digest.respond');           // when asked
+Route::get('ledger/{entry}', ShowEntry::class)->middleware('digest.respond:always'); // always
+```
+
+```http
+PUT /files/123 HTTP/1.1
+Content-Type: application/json
+Content-Digest: sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:
+
+{"hello": "world"}
+```
+
+**Verifying requests.** Every `sha-256` or `sha-512` digest in `Content-Digest` and `Repr-Digest`
+has to match the body as received. A failure is a 400 with one of the three problem types the
+httpapi working group's draft defines, each with the draft's extension members:
+
+| Problem | When | Extension member |
+|---|---|---|
+| `https://apiguide.dev/errors/digest-mismatched-values` | A digest does not match the content | `mismatched_digests` |
+| `https://apiguide.dev/errors/digest-invalid-values` | A value cannot be a digest of its algorithm, such as the wrong length | `invalid_digests` |
+| `https://apiguide.dev/errors/digest-unsupported-algorithms` | No member uses an algorithm this supports | `unsupported_algorithms` |
+
+- **Only sha-256 and sha-512** are supported, the two algorithms section 7.2 registers as Active.
+  The Deprecated ones (md5, sha, crc32c and others) MUST NOT be used where an attacker could be
+  involved (section 5), which describes any public API.
+- **Unsupported members beside a supported one are ignored**, as section 2 allows, so a client can
+  send a new algorithm alongside one the server knows.
+- **One bad digest fails the request**, even with a good one beside it. Accepting the request on
+  the strength of whichever digest matches would be a weakness.
+- **The server's own digest is never sent back** on a mismatch, as the draft says, so a response
+  cannot be used as an oracle.
+- **The problem types live on apiguide.dev** until the draft's are registered with IANA. They
+  mirror the draft's `https://iana.org/assignments/http-problem-types#digest-...` types and use its
+  extension member names, so moving to the IANA types will change only the URIs.
+
+**Adding to responses.** `digest.respond` adds the digests a client asks for with
+`Want-Content-Digest` or `Want-Repr-Digest`, using the algorithm it prefers most (section 4).
+Wants it cannot meet are ignored rather than refused, since section 4 makes them hints.
+`digest.respond:always` sends `Repr-Digest` on every response.
+
+HEAD responses get no digest. RFC 9530 allows `Repr-Digest` on one, but Laravel's router has
+already removed a HEAD response's content by the time route middleware sees it, so the digest
+would be of nothing. 204 and 304 responses, and streamed ones, get none either.
+
 ## Negotiation
 
 [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12),
@@ -920,6 +1036,9 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | Preferences, Async | `assertPreferenceApplied(name, ?value)` | `toHavePreferenceApplied(name, ?value)` | `Preference-Applied` lists the preference (RFC 7240 §3) |
 | | `assertPreferenceNotApplied(name)` | | It does not |
 | | `assertOperationAccepted()` | | 202 with `Location` and `Retry-After`; returns the monitor URL |
+| Digest Fields | `assertContentDigest()` | `toHaveContentDigest()` | `Content-Digest` is a Dictionary of Byte Sequences, and each sha-256 or sha-512 member matches the content (RFC 9530 §2) |
+| | `assertReprDigest()` | `toHaveReprDigest()` | Likewise for `Repr-Digest` (§3) |
+| Merge Patch | `assertAcceptsPatch(?mediaType)` | | `Accept-Patch` lists the media type (RFC 5789 §3.1), `application/merge-patch+json` by default |
 | Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 
@@ -951,6 +1070,8 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `ttl` | `86400` | Seconds a status is kept after its last change |
 | | `retry_after` | `5` | `Retry-After` seconds while an operation runs |
 | | `store` | default store | Cache store for statuses |
+| `mergePatch` | | | No options. Opt in per route with `merge-patch` |
+| `digests` | | | No options. Opt in per route with `digest.verify` and `digest.respond` |
 | `rateLimitHeaders` | `legacy_headers` | `true` | Keep Laravel's `X-RateLimit-*` headers |
 | `negotiation` | `request_id_header` | `X-Request-Id` | Request ID header name; `false` turns request IDs off |
 | | `trust_request_id` | `true` | Keep a well-formed incoming request ID |
@@ -966,6 +1087,9 @@ Every option, with its default. Options are passed inline to the feature's metho
 | `preconditions.required` | Conditional Requests | 428 without a precondition; `preconditions.required:PUT,POST` |
 | `idempotent` | Idempotency | Honours `Idempotency-Key`; `idempotent:required` for 400 without one |
 | `prefer` | Preferences | `return=minimal` and `Preference-Applied`, with `Vary: Prefer` |
+| `merge-patch` | Merge Patch | 415 with `Accept-Patch` for any other PATCH format |
+| `digest.verify` | Digest Fields | Checks `Content-Digest` and `Repr-Digest`; `digest.verify:required` for 400 without one |
+| `digest.respond` | Digest Fields | Adds the digests a client wants; `digest.respond:always` for `Repr-Digest` on every response |
 | `produces` | Negotiation | 406; `produces:application/json` |
 | `consumes` | Negotiation | 415; `consumes:application/json,application/merge-patch+json` |
 

@@ -58,6 +58,8 @@ return [
             // Retry-After, in seconds, while an operation is still running.
             'retry_after' => 5,
         ]),
+        Features::mergePatch(),
+        Features::digests(),
         // Experimental: built on an IETF draft that can still change.
         // Features::rateLimitHeaders(),
     ],

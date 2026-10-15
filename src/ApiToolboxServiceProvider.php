@@ -10,7 +10,9 @@ use JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider;
 use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
+use JustSteveKing\Toolbox\Digest\DigestServiceProvider;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
+use JustSteveKing\Toolbox\MergePatch\MergePatchServiceProvider;
 use JustSteveKing\Toolbox\Negotiation\NegotiationServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider;
@@ -40,6 +42,8 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::NEGOTIATION => NegotiationServiceProvider::class,
         Features::PREFERENCES => PreferencesServiceProvider::class,
         Features::ASYNC_OPERATIONS => AsyncOperationsServiceProvider::class,
+        Features::MERGE_PATCH => MergePatchServiceProvider::class,
+        Features::DIGESTS => DigestServiceProvider::class,
     ];
 
     public function register(): void
