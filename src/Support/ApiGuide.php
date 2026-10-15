@@ -28,6 +28,15 @@ final class ApiGuide
     /** 502 */
     public const string BAD_GATEWAY = self::BASE.'bad-gateway';
 
+    /** 400 */
+    public const string DIGEST_INVALID_VALUES = self::BASE.'digest-invalid-values';
+
+    /** 400 */
+    public const string DIGEST_MISMATCHED_VALUES = self::BASE.'digest-mismatched-values';
+
+    /** 400 */
+    public const string DIGEST_UNSUPPORTED_ALGORITHMS = self::BASE.'digest-unsupported-algorithms';
+
     /** 401 */
     public const string EXPIRED_AUTHENTICATION_TOKEN = self::BASE.'expired-authentication-token';
 
@@ -133,6 +142,9 @@ final class ApiGuide
     private const array TITLES = [
         self::ACCOUNT_FROZEN => 'Account Frozen',
         self::BAD_GATEWAY => 'Bad Gateway',
+        self::DIGEST_INVALID_VALUES => 'Invalid Digest Values',
+        self::DIGEST_MISMATCHED_VALUES => 'Mismatched Digest Values',
+        self::DIGEST_UNSUPPORTED_ALGORITHMS => 'Unsupported Hashing Algorithms',
         self::EXPIRED_AUTHENTICATION_TOKEN => 'Expired Authentication Token',
         self::FORBIDDEN => 'Forbidden',
         self::GATEWAY_TIMEOUT => 'Gateway Timeout',
@@ -174,6 +186,9 @@ final class ApiGuide
     private const array STATUS_CODES = [
         self::ACCOUNT_FROZEN => 403,
         self::BAD_GATEWAY => 502,
+        self::DIGEST_INVALID_VALUES => 400,
+        self::DIGEST_MISMATCHED_VALUES => 400,
+        self::DIGEST_UNSUPPORTED_ALGORITHMS => 400,
         self::EXPIRED_AUTHENTICATION_TOKEN => 401,
         self::FORBIDDEN => 403,
         self::GATEWAY_TIMEOUT => 504,

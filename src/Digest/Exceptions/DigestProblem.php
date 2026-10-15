@@ -19,17 +19,11 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  */
 final class DigestProblem extends BadRequestHttpException implements HasProblemExtensions, HasProblemType
 {
-    public const string UNSUPPORTED_ALGORITHMS = ApiGuide::BASE.'digest-unsupported-algorithms';
+    public const string UNSUPPORTED_ALGORITHMS = ApiGuide::DIGEST_UNSUPPORTED_ALGORITHMS;
 
-    public const string INVALID_VALUES = ApiGuide::BASE.'digest-invalid-values';
+    public const string INVALID_VALUES = ApiGuide::DIGEST_INVALID_VALUES;
 
-    public const string MISMATCHED_VALUES = ApiGuide::BASE.'digest-mismatched-values';
-
-    private const array TITLES = [
-        self::UNSUPPORTED_ALGORITHMS => 'Unsupported Hashing Algorithms',
-        self::INVALID_VALUES => 'Invalid Digest Values',
-        self::MISMATCHED_VALUES => 'Mismatched Digest Values',
-    ];
+    public const string MISMATCHED_VALUES = ApiGuide::DIGEST_MISMATCHED_VALUES;
 
     /**
      * @param  array<string, mixed>  $extensions
@@ -91,7 +85,7 @@ final class DigestProblem extends BadRequestHttpException implements HasProblemE
 
     public function problemTitle(): string
     {
-        return self::TITLES[$this->type];
+        return ApiGuide::title($this->type) ?? 'Bad Request';
     }
 
     public function problemExtensions(): array

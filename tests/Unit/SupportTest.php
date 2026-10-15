@@ -30,7 +30,7 @@ it('gives every catalogue type a title', function (): void {
         ARRAY_FILTER_USE_BOTH,
     );
 
-    expect($types)->toHaveCount(35);
+    expect($types)->toHaveCount(38);
 
     foreach ($types as $type) {
         expect($type)->toStartWith('https://apiguide.dev/errors/')
@@ -57,5 +57,5 @@ it('knows the status the catalogue documents each type with', function (): void 
     expect(ApiGuide::status(ApiGuide::ACCOUNT_FROZEN))->toBe(403)
         ->and(ApiGuide::status(ApiGuide::IDEMPOTENCY_KEY_CONFLICT))->toBe(422)
         ->and(ApiGuide::status('https://example.com/not-in-the-catalogue'))->toBeNull()
-        ->and(ApiGuide::types())->toHaveCount(35)->toContain(ApiGuide::GONE);
+        ->and(ApiGuide::types())->toHaveCount(38)->toContain(ApiGuide::GONE);
 });
