@@ -44,7 +44,7 @@ final class Features
      * Plain HTTP errors and validation failures use the apiguide.dev error catalogue as their
      * type unless 'apiguide' is false, in which case they use about:blank and the base URI.
      *
-     * @param  array{type_base_uri?: string, paths?: list<string>, apiguide?: bool}  $options
+     * @param  array{type_base_uri?: string, paths?: list<string>, apiguide?: bool, www_authenticate?: string|false}  $options
      */
     public static function problemDetails(array $options = []): string
     {

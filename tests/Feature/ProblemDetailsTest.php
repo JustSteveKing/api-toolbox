@@ -199,3 +199,21 @@ it('lets the type resolver be replaced, which is the seam for an external catalo
 
     $this->getJson('api/credit')->assertJsonPath('type', 'https://catalogue.example.com/out-of-credit');
 });
+
+it('sends a WWW-Authenticate challenge with a 401, which RFC 9110 section 15.5.2 requires', function (): void {
+    Route::get('api/me', fn () => throw new AuthenticationException);
+
+    $this->getJson('api/me')->assertStatus(401)->assertHeader('WWW-Authenticate', 'Bearer');
+});
+
+it('keeps a challenge the exception already carries', function (): void {
+    Route::get('api/basic', fn () => throw new Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException('Basic realm="admin"'));
+
+    $this->getJson('api/basic')->assertStatus(401)->assertHeader('WWW-Authenticate', 'Basic realm="admin"');
+});
+
+it('sends no challenge with other statuses', function (): void {
+    Route::get('api/admin', fn () => throw new AuthorizationException);
+
+    $this->getJson('api/admin')->assertStatus(403)->assertHeaderMissing('WWW-Authenticate');
+});

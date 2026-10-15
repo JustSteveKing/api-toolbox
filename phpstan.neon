@@ -11,6 +11,8 @@ parameters:
         - stubs
         # Analysed so traits meant for applications are analysed through a real use.
         - tests/Fixtures
+        - tools
+        - scripts
     # Public constructors check their input at runtime even where the PHPDoc already narrows
     # it, because callers are applications that PHPStan never sees.
     treatPhpDocTypesAsCertain: false

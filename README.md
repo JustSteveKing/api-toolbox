@@ -93,6 +93,7 @@ Features::problemDetails([
     'type_base_uri' => 'https://docs.example.com/problems', // default: /problems
     'paths' => ['api/*'],                                   // default: ['api/*']
     'apiguide' => true,                                     // default: true
+    'www_authenticate' => 'Bearer',                         // default: Bearer
 ]),
 ```
 
@@ -118,6 +119,12 @@ Your own problem types can use the catalogue too, through `JustSteveKing\Toolbox
 #[ProblemType(ApiGuide::ACCOUNT_FROZEN, title: 'Account Frozen', status: 403)]
 final class AccountFrozen extends ProblemException {}
 ```
+
+`ApiGuide` is generated from the catalogue, so a new catalogue entry reaches this package in a
+release. Maintainers regenerate it with `composer apiguide`, which reads the catalogue's `main`
+branch, checks every type URI resolves, and reports any status that has gained a single entry for
+someone to decide whether to map. A weekly workflow runs `composer apiguide -- --check` and fails
+when the committed copy has fallen behind.
 
 Set `'apiguide' => false` to use `about:blank` with the status phrase for plain HTTP errors
 instead (section 4.2.1), and to resolve the validation type against `type_base_uri`. Types a
@@ -175,6 +182,13 @@ A status gets a catalogue type only when one entry is the plain meaning of that 
 several candidates, such as 400 and 422, get `about:blank` with the status phrase, as section
 4.2.1 asks, rather than a type that claims more than the status says. Any headers the exception
 carries, such as `Retry-After` or `ETag`, are kept.
+
+A 401 carries a `WWW-Authenticate` challenge, because RFC 9110 section 15.5.2 says every 401 MUST.
+Laravel's `AuthenticationException` carries none, so the package adds the one in
+`www_authenticate`: `Bearer` by default, the scheme Sanctum and Passport tokens use. Set it to
+match how your API authenticates, such as `'Bearer realm="api"'` or `'Basic realm="admin"'`. An
+exception that already brings a challenge, such as Symfony's `UnauthorizedHttpException`, keeps
+its own. `false` sends none; only do that if something else adds the header.
 
 An unexpected exception gets only `type`, `title` and `status`. Its message and trace are added
 only when `app.debug` is on, since section 5 warns against exposing implementation details.
@@ -558,8 +572,26 @@ Cache-Control: no-store, private
   `ProblemException`, if that is what your limit is.
 
 This works by binding Laravel's `ThrottleRequests` middleware to a subclass in the container.
-`ThrottleRequestsWithRedis`, which an application opts into with `throttleWithRedis()`, is not
-covered.
+
+### Known gap: Redis throttling
+
+Applications that call `throttleWithRedis()` get no RateLimit headers. Their 429s are still
+rendered as problems, but without `RateLimit`, `RateLimit-Policy` or `no-store`.
+
+That is deliberate for now, for three reasons:
+
+- **It is a different middleware.** `throttleWithRedis()` points the `throttle` alias at
+  `ThrottleRequestsWithRedis`, so binding `ThrottleRequests` never reaches it.
+- **It counts differently.** It does not use Laravel's cache-backed `RateLimiter`. Each limit is a
+  `DurationLimiter`, a Lua script run in Redis, and the remaining count and reset time live in
+  arrays on the middleware instance, filled as each limit is checked. Supporting it means a second
+  subclass that mirrors that class's own `handleRequest()`, a second set of framework internals to
+  track.
+- **It cannot be tested here.** Proving it works needs a Redis server in the test suite, and this
+  feature is experimental already. Untested support for it would be worse than none.
+
+The fix is clear once those are in place: the same `PolicyHeaders` builder, fed from that class's
+`remaining` and `decaysAt` instead of the cache.
 
 The draft does not say whether the policy item in `RateLimit` (section 4) must be a String the way
 section 3 requires for `RateLimit-Policy`. Every example uses one, and the same name has to
@@ -707,6 +739,7 @@ Every option, with its default. Options are passed inline to the feature's metho
 | `problemDetails` | `type_base_uri` | `/problems` | Base URI for type slugs in `#[ProblemType]` |
 | | `paths` | `['api/*']` | Paths that always get problem details, whatever `Accept` says |
 | | `apiguide` | `true` | Type plain HTTP errors and validation with the apiguide.dev catalogue |
+| | `www_authenticate` | `Bearer` | The challenge sent with a 401; `false` for none |
 | `deprecation` | `global` | `true` | Run on every request; otherwise use the `deprecation` middleware |
 | `conditionalRequests` | | | No options. Opt in per route with `conditional` |
 | `pagination` | | | No options. Use `CursorPage` |

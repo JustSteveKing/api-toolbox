@@ -1,0 +1,31 @@
+name: apiguide.dev catalogue
+
+# Support\ApiGuide is generated from the apiguide.dev error catalogue. This checks weekly that it
+# still matches, rather than on every pull request, so a catalogue change never fails unrelated
+# work. A failure here means: run `composer apiguide` and commit the result.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      - uses: ramsey/composer-install@v4
+
+      - run: composer apiguide -- --check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

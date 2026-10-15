@@ -28,7 +28,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "JustSteveKing\\Toolbox\\Tests\\": "tests/"
+            "JustSteveKing\\Toolbox\\Tests\\": "tests/",
+            "JustSteveKing\\Toolbox\\Tools\\": "tools/"
         }
     },
     "extra": {
@@ -60,6 +61,7 @@
         "test": "pest",
         "analyse": "phpstan analyse --memory-limit=1G",
         "format": "pint",
-        "lint": "pint --test"
+        "lint": "pint --test",
+        "apiguide": "@php scripts/generate-apiguide.php"
     }
 }

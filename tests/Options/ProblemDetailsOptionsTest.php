@@ -40,3 +40,9 @@ it('resolves the validation type against the base URI when the catalogue is off'
 
     $this->postJson('v1/leads')->assertJsonPath('type', 'https://docs.example.com/problems/validation-failed');
 });
+
+it('sends the configured challenge', function (): void {
+    Route::get('v1/me', fn () => throw new Illuminate\Auth\AuthenticationException);
+
+    $this->getJson('v1/me')->assertHeader('WWW-Authenticate', 'Bearer realm="api", error="invalid_token"');
+});

@@ -16,10 +16,12 @@ final readonly class ProblemRenderer
 
     /**
      * @param  list<string>  $paths  Request path patterns that always get problem details.
+     * @param  string|null  $challenge  The WWW-Authenticate challenge for a 401 that has none.
      */
     public function __construct(
         private ProblemFactory $factory,
         private array $paths = [],
+        private ?string $challenge = null,
     ) {}
 
     /**
@@ -38,7 +40,16 @@ final readonly class ProblemRenderer
             return null;
         }
 
-        return $this->respond($problem, $this->headersFrom($e));
+        $headers = $this->headersFrom($e);
+
+        // RFC 9110 section 15.5.2: a 401 MUST carry a WWW-Authenticate field with at least one
+        // challenge. Laravel's AuthenticationException carries none, so the configured one is
+        // added. An exception that already brings its own challenge keeps it.
+        if ($problem->status === 401 && $this->challenge !== null && ! $this->hasChallenge($headers)) {
+            $headers['WWW-Authenticate'] = $this->challenge;
+        }
+
+        return $this->respond($problem, $headers);
     }
 
     /**
@@ -83,6 +94,20 @@ final readonly class ProblemRenderer
         }
 
         return $headers;
+    }
+
+    /**
+     * @param  array<string, string|list<string>>  $headers
+     */
+    private function hasChallenge(array $headers): bool
+    {
+        foreach (array_keys($headers) as $name) {
+            if (strcasecmp($name, 'WWW-Authenticate') === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

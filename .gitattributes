@@ -7,3 +7,5 @@
 /phpstan.neon       export-ignore
 /phpunit.xml        export-ignore
 /pint.json          export-ignore
+/scripts            export-ignore
+/tools              export-ignore

@@ -24,6 +24,8 @@ return [
             'paths' => ['api/*'],
             // Type plain HTTP errors with the apiguide.dev catalogue rather than about:blank.
             'apiguide' => true,
+            // The challenge a 401 carries, which RFC 9110 section 15.5.2 says it MUST.
+            'www_authenticate' => 'Bearer',
         ]),
         Features::deprecation([
             // Run on every request; turn off to add the "deprecation" middleware per route instead.
