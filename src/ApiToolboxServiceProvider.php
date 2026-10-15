@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox;
 
+use Composer\InstalledVersions;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 use JustSteveKing\Toolbox\ApiCatalog\ApiCatalogServiceProvider;
 use JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider;
@@ -50,6 +52,29 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::API_CATALOG => ApiCatalogServiceProvider::class,
     ];
 
+    /**
+     * How each feature is named in `php artisan about`.
+     *
+     * @var array<string, string>
+     */
+    private const array LABELS = [
+        Features::PROBLEM_DETAILS => 'Problem Details',
+        Features::DEPRECATION => 'Deprecation',
+        Features::CONDITIONAL_REQUESTS => 'Conditional Requests',
+        Features::PAGINATION => 'Pagination',
+        Features::IDEMPOTENCY => 'Idempotency',
+        Features::RATE_LIMIT_HEADERS => 'RateLimit Headers',
+        Features::NEGOTIATION => 'Negotiation',
+        Features::PREFERENCES => 'Preferences',
+        Features::ASYNC_OPERATIONS => 'Async Operations',
+        Features::MERGE_PATCH => 'Merge Patch',
+        Features::DIGESTS => 'Digest Fields',
+        Features::MESSAGE_SIGNATURES => 'Message Signatures',
+        Features::API_CATALOG => 'API Catalog',
+    ];
+
+    public const string ABOUT_SECTION = 'API Toolbox';
+
     public function register(): void
     {
         // The merged file carries no options; see stubs/api-toolbox.php for why.
@@ -77,6 +102,56 @@ final class ApiToolboxServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../stubs/api-toolbox.php' => $this->app->configPath(Features::CONFIG_KEY.'.php'),
             ], Features::CONFIG_KEY.'-config');
+
+            self::about($this->app->make(EnabledFeatures::class));
         }
+    }
+
+    /**
+     * Adds the package to `php artisan about`: its version, and whether each feature is on. The
+     * closure is static and holds only the enabled features, not the application, because
+     * AboutCommand keeps it in a static registry.
+     */
+    private static function about(EnabledFeatures $features): void
+    {
+        if (! class_exists(AboutCommand::class)) {
+            return;
+        }
+
+        AboutCommand::add(self::ABOUT_SECTION, static function () use ($features): array {
+            $rows = [
+                'Version' => InstalledVersions::isInstalled('juststeveking/api-toolbox')
+                    ? (string) InstalledVersions::getPrettyVersion('juststeveking/api-toolbox')
+                    : 'unknown',
+            ];
+
+            foreach (Features::all() as $feature) {
+                $experimental = in_array($feature, Features::EXPERIMENTAL, true);
+
+                $rows[self::LABELS[$feature]] = AboutCommand::format(
+                    $features->enabled($feature),
+                    console: static fn (mixed $enabled): string => match (true) {
+                        $enabled === true && $experimental => '<fg=yellow;options=bold>ENABLED</> (experimental)',
+                        $enabled === true => '<fg=yellow;options=bold>ENABLED</>',
+                        default => 'OFF',
+                    },
+                );
+            }
+
+            // Key IDs and algorithms only: never a secret or a key's location.
+            if ($features->enabled(Features::MESSAGE_SIGNATURES)) {
+                $keys = $features->options(Features::MESSAGE_SIGNATURES)['keys'] ?? [];
+                $described = [];
+
+                foreach (is_array($keys) ? $keys : [] as $id => $key) {
+                    $algorithm = is_array($key) && is_string($key['algorithm'] ?? null) ? $key['algorithm'] : '?';
+                    $described[] = "{$id} ({$algorithm})";
+                }
+
+                $rows['Signature Keys'] = $described === [] ? 'none' : implode(', ', $described);
+            }
+
+            return $rows;
+        });
     }
 }

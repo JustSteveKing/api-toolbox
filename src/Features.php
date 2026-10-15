@@ -225,6 +225,13 @@ final class Features
     }
 
     /**
+     * Features built on an IETF draft that is still changing, which can break in a minor release.
+     *
+     * @var list<string>
+     */
+    public const array EXPERIMENTAL = [self::RATE_LIMIT_HEADERS];
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>

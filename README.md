@@ -78,6 +78,11 @@ ApiToolbox::enabled(Features::idempotency());
 
 Or inject `JustSteveKing\Toolbox\Contracts\EnabledFeatures`.
 
+`php artisan about` has an API Toolbox section listing the installed version, each feature as
+enabled or off, and the configured signature key IDs with their algorithms, never their secrets
+or paths. `php artisan about --only=api_toolbox` shows just that section. In `--json` output it is
+keyed `a_p_i_toolbox`, because Laravel snake-cases section names.
+
 The config follows Laravel Fortify's `Features` design, and works with `php artisan config:cache`
 for the same reason Fortify's does.
 
