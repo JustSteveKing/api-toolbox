@@ -16,6 +16,7 @@ abstract class WithOptionsTestCase extends TestCase
                 'paths' => ['v1/*'],
                 'apiguide' => false,
                 'www_authenticate' => 'Bearer realm="api", error="invalid_token"',
+                'instance_from_request_id' => false,
             ]),
             Features::deprecation(['global' => false]),
             Features::idempotency([
@@ -29,6 +30,7 @@ abstract class WithOptionsTestCase extends TestCase
                 'trust_request_id' => false,
                 'propagate_trace' => false,
             ]),
+            Features::asyncOperations(['path' => 'v1/jobs', 'middleware' => [], 'retry_after' => 30]),
         ];
     }
 }

@@ -34,6 +34,8 @@ $features = [
     'JustSteveKing\Toolbox\Idempotency',
     'JustSteveKing\Toolbox\RateLimitHeaders',
     'JustSteveKing\Toolbox\Negotiation',
+    'JustSteveKing\Toolbox\Preferences',
+    'JustSteveKing\Toolbox\AsyncOperations',
 ];
 
 foreach ($features as $feature) {

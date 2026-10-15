@@ -16,6 +16,8 @@ Requires PHP 8.3 and Laravel 13.30 or later.
 | [Pagination](#pagination) | [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288) | Stable |
 | [Idempotency](#idempotency) | [draft-ietf-httpapi-idempotency-key-header-07](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/) | Stable; the draft has expired |
 | [RateLimit headers](#ratelimit-headers-experimental) | [draft-ietf-httpapi-ratelimit-headers-11](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) | Experimental |
+| [Preferences](#preferences) | [RFC 7240](https://www.rfc-editor.org/rfc/rfc7240) | Stable |
+| [Async operations](#async-operations) | [RFC 9110 §15.3.3](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3), [RFC 7240 §4.1](https://www.rfc-editor.org/rfc/rfc7240#section-4.1); the status monitor is this package's own | Stable |
 | [Negotiation](#negotiation) | [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12), [W3C Trace Context](https://www.w3.org/TR/trace-context/); request IDs have no standard | Stable |
 | [Testing](#testing) | Assertions for each of the above | Stable |
 
@@ -47,6 +49,8 @@ use JustSteveKing\Toolbox\Features;
     Features::pagination(),
     Features::idempotency(['ttl' => 86400]),
     Features::negotiation(),
+    Features::preferences(),
+    Features::asyncOperations(),
     // Features::rateLimitHeaders(),
 ],
 ```
@@ -218,6 +222,18 @@ Laravel's `AuthenticationException` carries none, so the package adds the one in
 match how your API authenticates, such as `'Bearer realm="api"'` or `'Basic realm="admin"'`. An
 exception that already brings a challenge, such as Symfony's `UnauthorizedHttpException`, keeps
 its own. `false` sends none; only do that if something else adds the header.
+
+With Negotiation assigning request IDs, every problem gets an `instance`: the request ID as a
+`urn:uuid` URI (RFC 9562 section 4), so an error a client reports leads straight to its log lines.
+
+```json
+{"type":"https://apiguide.dev/errors/gone","title":"Gone","status":410,"instance":"urn:uuid:0199e7f4-5d2a-7c3e-9b1a-4f2d8e6c1a07"}
+```
+
+Section 3.1.5 says `instance` identifies the occurrence and need not be dereferenceable, which is
+what a request ID is. An ID that is not a UUID, such as one a proxy assigned, has no standard URI
+form and leaves `instance` out rather than becoming an invalid URI. An `instance` a problem class
+sets itself is kept. Set `instance_from_request_id` to `false` to turn this off.
 
 An unexpected exception gets only `type`, `title` and `status`. Its message and trace are added
 only when `app.debug` is on, since section 5 warns against exposing implementation details.
@@ -442,6 +458,23 @@ On a GET with no bound model, the ETag is a hash of the response content.
   instead when the change appears to have been applied already, but they also say a server is
   better off sending 412 for every failure on an unsafe method.
 
+### Caching directives
+
+Laravel's own `cache.headers` middleware already writes `Cache-Control`, including
+`stale-while-revalidate` and `stale-if-error` ([RFC 5861](https://www.rfc-editor.org/rfc/rfc5861))
+and `immutable` ([RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)), so this package does not
+replace it. Use it beside `conditional`, and leave its `etag` option off: `conditional` already
+sends the ETag, from the model where there is one.
+
+```php
+Route::get('documents/{document}', ShowDocument::class)->middleware([
+    'conditional',
+    'cache.headers:public;max_age=60;stale_while_revalidate=30;stale_if_error=86400',
+]);
+```
+
+`assertCacheControl()` checks the result.
+
 ## Pagination
 
 [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)
@@ -626,6 +659,136 @@ The draft does not say whether the policy item in `RateLimit` (section 4) must b
 section 3 requires for `RateLimit-Policy`. Every example uses one, and the same name has to
 identify the same policy in both, so this package always sends a String.
 
+## Preferences
+
+[RFC 7240](https://www.rfc-editor.org/rfc/rfc7240)
+
+APIs grow query parameters such as `?return=none` or `?async=1` to let a client ask for a lighter
+response or background processing. RFC 7240 already defines the header for this, `Prefer`, and
+one for the server to say what it honoured, `Preference-Applied`.
+
+```php
+Features::preferences(),
+```
+
+```php
+Route::middleware('prefer')->group(function () {
+    Route::post('items', CreateItem::class);
+    Route::patch('items/{item}', UpdateItem::class);
+});
+```
+
+| Preference | What happens |
+|---|---|
+| `return=minimal` | A successful response to an unsafe method is emptied: 200 becomes 204, other 2xx keep their status and headers, `Location` included (section 4.2) |
+| `return=representation` | Reported in `Preference-Applied` when the response has a body |
+| `handling=strict` | Form requests using `HonoursHandlingPreference` reject fields their rules do not know (section 4.4) |
+| `respond-async` | Read by [async operations](#async-operations) |
+| `wait` | Available to read; nothing acts on it by default |
+
+- **`Vary: Prefer` is always sent.** Section 2 says a server that might vary a response on a
+  preference MUST say so, whether or not this request used one.
+- **GET and HEAD are left alone.** `return=minimal` is about the result of a change.
+- **Unknown preferences and malformed ones are ignored**, as section 2 requires, and only the
+  first occurrence of each counts.
+- **Conflicting pairs cancel out.** `return=minimal` with `return=representation`, or
+  `handling=strict` with `handling=lenient`, is treated as neither, as sections 4.2 and 4.4
+  suggest. Section 2's first-occurrence rule would otherwise pick one; both together mean a
+  client bug, and guessing is worse than honouring neither.
+
+Read preferences anywhere by injecting `JustSteveKing\Toolbox\Preferences\Preferences`, and
+record one you honoured with `$preferences->applied('wait', '10')`; the `prefer` middleware writes
+it to `Preference-Applied`.
+
+### Strict handling
+
+```php
+use JustSteveKing\Toolbox\Preferences\Validation\HonoursHandlingPreference;
+
+final class StoreLead extends FormRequest
+{
+    use HonoursHandlingPreference;
+}
+```
+
+Laravel ignores input it was not asked to validate. Under `Prefer: handling=strict`, a field with
+no rule fails validation instead, so a client's typo is caught instead of silently dropped.
+Section 4.4 leaves what counts as recoverable to the server; this is the part Laravel forgives.
+Only top-level fields are checked, so a rule for `items.*.sku` covers all of `items`.
+
+## Async operations
+
+[RFC 9110 §15.3.3](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3),
+[RFC 7240 §4.1](https://www.rfc-editor.org/rfc/rfc7240#section-4.1)
+
+A report that takes two minutes to build cannot be built inside a request. The usual answer is a
+202 Accepted and a URL to check on progress, and every API builds that URL its own way. This
+builds it on Laravel's queues.
+
+**The standards stop at the 202.** RFC 9110 says a 202 "ought to ... point to ... a status
+monitor", and RFC 7240 says what happens next is out of scope. The status monitor below is this
+package's convention, built from standard parts.
+
+```php
+Features::asyncOperations([
+    'path' => 'api/operations', // where status monitors live
+    'middleware' => ['api'],
+    'ttl' => 86400,             // seconds a status is kept after its last change
+    'retry_after' => 5,         // Retry-After while it runs
+]),
+```
+
+```php
+public function store(Request $request, Operations $operations, Preferences $preferences)
+{
+    if ($preferences->respondAsync()) {
+        return $operations->dispatch(new GenerateReport($request->validated()));
+    }
+
+    return new ReportResource((new GenerateReport($request->validated()))->handle());
+}
+```
+
+```http
+HTTP/1.1 202 Accepted
+Location: https://api.example.com/api/operations/0199e7f4-5d2a-7c3e-9b1a-4f2d8e6c1a07
+Retry-After: 5
+Preference-Applied: respond-async
+
+{"id":"0199e7f4-...","status":"pending","created_at":"...","updated_at":"..."}
+```
+
+The job says where its result is:
+
+```php
+public function handle(CurrentOperation $operation): void
+{
+    $report = Report::create(/* ... */);
+
+    $operation->resultAt(route('reports.show', $report));
+}
+```
+
+| Status | The monitor answers |
+|---|---|
+| `pending`, `running` | 200 with the status, and `Retry-After` |
+| `succeeded` | 303 See Other to the result (RFC 9110 §15.4.4); 200 if the job named none |
+| `failed` | 200 with the status and an `error` problem object |
+| unknown, expired, or someone else's | 404 |
+
+- **Any queued job works**, as long as it uses Laravel's `Queueable` trait: the tracking is
+  attached as job middleware.
+- **Retries are followed.** A failure with attempts left goes back to `pending`; only the last
+  attempt's failure is `failed`.
+- **Failures do not leak.** An unexpected exception becomes `internal-server-error` with no
+  message, as RFC 9457 section 5 advises; an HTTP exception keeps its status and message.
+- **Operations are private to whoever started them**, when someone was signed in to start them.
+- **The monitor answers 200 for a failed operation**, because the monitor itself was found. The
+  failure is in its content.
+- **Status lives in the cache**, like idempotency keys. A cache that evicts under memory pressure
+  can lose a status early; the monitor then answers 404.
+- A job that times out or is failed manually, without throwing, stays `running` until its TTL.
+
 ## Negotiation
 
 [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12),
@@ -753,6 +916,10 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | RateLimit headers | `assertRateLimitHeaders(?policy, ?remaining)` | `toHaveRateLimitHeaders(?policy, ?remaining)` | Both fields parse as RFC 9651 Lists with the draft's parameters and types (draft §3, §4), and describe the policy if given |
 | Negotiation | `assertTraceparent(?traceId)` | `toHaveTraceparent(?traceId)` | A valid version 00 `traceparent` (Trace Context §3.2), in the given trace if one is passed |
 | | `assertRequestId(?id)` | `toHaveRequestId(?id)` | The configured request ID header is present, with the given value if one is passed |
+| Conditional Requests | `assertCacheControl(directives)` | `toHaveCacheControl(directives)` | `Cache-Control` parses (RFC 9111 §5.2) and has each directive, with its value where given |
+| Preferences, Async | `assertPreferenceApplied(name, ?value)` | `toHavePreferenceApplied(name, ?value)` | `Preference-Applied` lists the preference (RFC 7240 §3) |
+| | `assertPreferenceNotApplied(name)` | | It does not |
+| | `assertOperationAccepted()` | | 202 with `Location` and `Retry-After`; returns the monitor URL |
 | Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 
@@ -769,6 +936,7 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `paths` | `['api/*']` | Paths that always get problem details, whatever `Accept` says |
 | | `apiguide` | `true` | Type plain HTTP errors and validation with the apiguide.dev catalogue |
 | | `www_authenticate` | `Bearer` | The challenge sent with a 401; `false` for none |
+| | `instance_from_request_id` | `true` | Set `instance` to the request ID as a `urn:uuid` |
 | `deprecation` | `global` | `true` | Run on every request; otherwise use the `deprecation` middleware |
 | `conditionalRequests` | | | No options. Opt in per route with `conditional` |
 | `pagination` | | | No options. Use `CursorPage` |
@@ -777,6 +945,12 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `lock` | `60` | Longest a request is treated as in flight |
 | | `retry_after` | `1` | `Retry-After` seconds on a 409 |
 | | `documentation` | `null` | URL linked from a 400 as `rel="describedby"` |
+| `preferences` | | | No options. Opt in per route with `prefer` |
+| `asyncOperations` | `path` | `api/operations` | Where status monitors live |
+| | `middleware` | `['api']` | Middleware the status monitor runs behind |
+| | `ttl` | `86400` | Seconds a status is kept after its last change |
+| | `retry_after` | `5` | `Retry-After` seconds while an operation runs |
+| | `store` | default store | Cache store for statuses |
 | `rateLimitHeaders` | `legacy_headers` | `true` | Keep Laravel's `X-RateLimit-*` headers |
 | `negotiation` | `request_id_header` | `X-Request-Id` | Request ID header name; `false` turns request IDs off |
 | | `trust_request_id` | `true` | Keep a well-formed incoming request ID |
@@ -791,6 +965,7 @@ Every option, with its default. Options are passed inline to the feature's metho
 | `validators` | Conditional Requests | Adds `ETag` and `Last-Modified`; `validators:weak` for a weak hash |
 | `preconditions.required` | Conditional Requests | 428 without a precondition; `preconditions.required:PUT,POST` |
 | `idempotent` | Idempotency | Honours `Idempotency-Key`; `idempotent:required` for 400 without one |
+| `prefer` | Preferences | `return=minimal` and `Preference-Applied`, with `Vary: Prefer` |
 | `produces` | Negotiation | 406; `produces:application/json` |
 | `consumes` | Negotiation | 415; `consumes:application/json,application/merge-patch+json` |
 

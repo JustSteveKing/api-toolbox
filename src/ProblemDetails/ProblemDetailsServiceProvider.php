@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
+use JustSteveKing\Toolbox\Contracts\RequestIdentifier;
 use JustSteveKing\Toolbox\Features;
 use JustSteveKing\Toolbox\ProblemDetails\Console\MakeApiProblemCommand;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
@@ -37,6 +38,7 @@ final class ProblemDetailsServiceProvider extends ServiceProvider
         $paths = $options['paths'] ?? self::DEFAULT_PATHS;
         $apiGuide = ($options['apiguide'] ?? true) === true;
         $challenge = self::challenge($options['www_authenticate'] ?? self::DEFAULT_CHALLENGE);
+        $instances = ($options['instance_from_request_id'] ?? true) === true;
 
         $this->app->singleton(TypeResolver::class, static fn (): TypeResolver => new BaseUriTypeResolver(
             is_string($baseUri) ? $baseUri : BaseUriTypeResolver::DEFAULT_BASE,
@@ -54,6 +56,7 @@ final class ProblemDetailsServiceProvider extends ServiceProvider
             $app->make(ProblemFactory::class),
             is_array($paths) ? array_values(array_filter($paths, is_string(...))) : [],
             $challenge,
+            $instances && $app->bound(RequestIdentifier::class) ? $app->make(RequestIdentifier::class) : null,
         ));
     }
 

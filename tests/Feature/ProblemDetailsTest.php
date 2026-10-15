@@ -14,6 +14,11 @@ use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\Tests\Fixtures\OutOfCredit;
 
+function occurrence(Illuminate\Testing\TestResponse $response): string
+{
+    return 'urn:uuid:'.$response->headers->get('X-Request-Id');
+}
+
 it('registers its provider when enabled', function (): void {
     expect(app()->getProviders(ProblemDetailsServiceProvider::class))->toHaveCount(1);
 });
@@ -44,14 +49,16 @@ it('maps validation errors to the apiguide.dev validation-failed type and its er
         ])->validate();
     });
 
-    $this->postJson('api/leads', ['start_date' => '2026-10-15', 'end_date' => '2026-10-01'])
-        ->assertStatus(422)
+    $response = $this->postJson('api/leads', ['start_date' => '2026-10-15', 'end_date' => '2026-10-01']);
+
+    $response->assertStatus(422)
         ->assertHeader('Content-Type', 'application/problem+json')
         ->assertExactJson([
             'type' => 'https://apiguide.dev/errors/validation-failed',
             'title' => 'Validation Failed',
             'status' => 422,
             'detail' => 'The end date field must be a date after start date.',
+            'instance' => occurrence($response),
             'errors' => [
                 'end_date' => ['The end date field must be a date after start date.'],
             ],
@@ -108,11 +115,14 @@ it('uses the type a feature exception names through HasProblemType', function ()
         }
     });
 
-    $this->getJson('api/cursor')->assertStatus(400)->assertExactJson([
+    $response = $this->getJson('api/cursor');
+
+    $response->assertStatus(400)->assertExactJson([
         'type' => 'https://apiguide.dev/errors/invalid-pagination-cursor',
         'title' => 'Invalid Pagination Cursor',
         'status' => 400,
         'detail' => 'The cursor parameter could not be decoded.',
+        'instance' => occurrence($response),
     ]);
 });
 
@@ -142,6 +152,7 @@ it('hides the message and trace of an unexpected exception outside debug mode', 
         'type' => 'https://apiguide.dev/errors/internal-server-error',
         'title' => 'Internal Server Error',
         'status' => 500,
+        'instance' => occurrence($response),
     ]);
 });
 
@@ -216,4 +227,25 @@ it('sends no challenge with other statuses', function (): void {
     Route::get('api/admin', fn () => throw new AuthorizationException);
 
     $this->getJson('api/admin')->assertStatus(403)->assertHeaderMissing('WWW-Authenticate');
+});
+
+it('identifies each occurrence by its request ID, as a urn:uuid (RFC 9457 section 3.1.5)', function (): void {
+    Route::get('api/gone', fn () => abort(410));
+
+    $response = $this->getJson('api/gone');
+
+    expect($response->json('instance'))->toBe('urn:uuid:'.$response->headers->get('X-Request-Id'))
+        ->and($response->json('instance'))->toMatch('/^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/');
+});
+
+it('keeps an instance the problem sets itself', function (): void {
+    Route::get('api/credit', fn () => throw new OutOfCredit(instance: '/account/12345/msgs/abc'));
+
+    $this->getJson('api/credit')->assertJsonPath('instance', '/account/12345/msgs/abc');
+});
+
+it('leaves instance out when the request ID is not a UUID', function (): void {
+    Route::get('api/gone', fn () => abort(410));
+
+    $this->getJson('api/gone', ['X-Request-Id' => 'lb-7f3a91'])->assertJsonMissingPath('instance');
 });

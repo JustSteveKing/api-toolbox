@@ -36,6 +36,10 @@ final class Features
 
     public const string NEGOTIATION = 'negotiation';
 
+    public const string PREFERENCES = 'preferences';
+
+    public const string ASYNC_OPERATIONS = 'async-operations';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -44,7 +48,7 @@ final class Features
      * Plain HTTP errors and validation failures use the apiguide.dev error catalogue as their
      * type unless 'apiguide' is false, in which case they use about:blank and the base URI.
      *
-     * @param  array{type_base_uri?: string, paths?: list<string>, apiguide?: bool, www_authenticate?: string|false}  $options
+     * @param  array{type_base_uri?: string, paths?: list<string>, apiguide?: bool, www_authenticate?: string|false, instance_from_request_id?: bool}  $options
      */
     public static function problemDetails(array $options = []): string
     {
@@ -136,6 +140,33 @@ final class Features
     }
 
     /**
+     * The Prefer request field: return=minimal and return=representation through the "prefer"
+     * middleware, handling=strict for form requests, and Preference-Applied.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc7240
+     */
+    public static function preferences(): string
+    {
+        return self::PREFERENCES;
+    }
+
+    /**
+     * Queued jobs as asynchronous operations: 202 Accepted pointing at a status monitor, which
+     * answers 303 See Other to the result once the job is done.
+     *
+     * RFC 9110 defines 202 and 303, and RFC 7240 the respond-async preference. What happens after
+     * the 202 is left to the server by both, so the status monitor's shape is this package's own.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3
+     *
+     * @param  array{store?: string, ttl?: int, retry_after?: int, path?: string, middleware?: list<string>}  $options
+     */
+    public static function asyncOperations(array $options = []): string
+    {
+        return self::withOptions(self::ASYNC_OPERATIONS, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -150,6 +181,8 @@ final class Features
             self::IDEMPOTENCY,
             self::RATE_LIMIT_HEADERS,
             self::NEGOTIATION,
+            self::PREFERENCES,
+            self::ASYNC_OPERATIONS,
         ];
     }
 

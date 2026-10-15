@@ -6,12 +6,14 @@ namespace JustSteveKing\Toolbox;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\ServiceProvider;
+use JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider;
 use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
 use JustSteveKing\Toolbox\Negotiation\NegotiationServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
+use JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\RateLimitHeaders\RateLimitHeadersServiceProvider;
 use JustSteveKing\Toolbox\Testing\TestingServiceProvider;
@@ -36,6 +38,8 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::IDEMPOTENCY => IdempotencyServiceProvider::class,
         Features::RATE_LIMIT_HEADERS => RateLimitHeadersServiceProvider::class,
         Features::NEGOTIATION => NegotiationServiceProvider::class,
+        Features::PREFERENCES => PreferencesServiceProvider::class,
+        Features::ASYNC_OPERATIONS => AsyncOperationsServiceProvider::class,
     ];
 
     public function register(): void

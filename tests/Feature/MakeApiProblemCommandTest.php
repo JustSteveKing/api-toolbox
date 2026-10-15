@@ -78,12 +78,11 @@ it('writes a class that renders as the problem it describes', function (): void 
 
     Route::get('api/quota', fn () => throw new App\Problems\QuotaGone(detail: 'Come back tomorrow.'));
 
-    $this->getJson('api/quota')->assertExactJson([
-        'type' => '/problems/quota-gone',
-        'title' => 'Your quota is gone.',
-        'status' => 429,
-        'detail' => 'Come back tomorrow.',
-    ]);
+    $this->getJson('api/quota')
+        ->assertJsonPath('type', '/problems/quota-gone')
+        ->assertJsonPath('title', 'Your quota is gone.')
+        ->assertJsonPath('status', 429)
+        ->assertJsonPath('detail', 'Come back tomorrow.');
 });
 
 it('prompts for a missing title and status', function (): void {

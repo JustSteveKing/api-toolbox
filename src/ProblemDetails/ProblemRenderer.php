@@ -7,6 +7,7 @@ namespace JustSteveKing\Toolbox\ProblemDetails;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use JustSteveKing\Toolbox\Contracts\RequestIdentifier;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -22,6 +23,7 @@ final readonly class ProblemRenderer
         private ProblemFactory $factory,
         private array $paths = [],
         private ?string $challenge = null,
+        private ?RequestIdentifier $requestId = null,
     ) {}
 
     /**
@@ -39,6 +41,8 @@ final readonly class ProblemRenderer
         if ($problem === null) {
             return null;
         }
+
+        $problem = $this->withInstance($problem);
 
         $headers = $this->headersFrom($e);
 
@@ -94,6 +98,24 @@ final readonly class ProblemRenderer
         }
 
         return $headers;
+    }
+
+    /**
+     * RFC 9457 section 3.1.5: "instance" identifies this occurrence of the problem, and need not be
+     * dereferenceable. The request ID does exactly that, and a UUID has a standard URI form,
+     * urn:uuid (RFC 9562, section 4). An ID that is not a UUID, such as one a proxy assigned, has
+     * no such form and is left out rather than made into an invalid URI. An instance the problem
+     * already has is kept.
+     */
+    private function withInstance(Problem $problem): Problem
+    {
+        $id = $this->requestId?->current();
+
+        if ($problem->instance !== null || $id === null || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) !== 1) {
+            return $problem;
+        }
+
+        return new Problem($problem->status, $problem->type, $problem->title, $problem->detail, 'urn:uuid:'.strtolower($id), $problem->extensions);
     }
 
     /**

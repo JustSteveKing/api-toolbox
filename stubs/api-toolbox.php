@@ -48,6 +48,16 @@ return [
             'trace_context' => true,
             'propagate_trace' => true,
         ]),
+        Features::preferences(),
+        Features::asyncOperations([
+            // Where the status monitor lives, and the middleware it runs behind.
+            'path' => 'api/operations',
+            'middleware' => ['api'],
+            // Seconds an operation's status is kept after its last change.
+            'ttl' => 86400,
+            // Retry-After, in seconds, while an operation is still running.
+            'retry_after' => 5,
+        ]),
         // Experimental: built on an IETF draft that can still change.
         // Features::rateLimitHeaders(),
     ],

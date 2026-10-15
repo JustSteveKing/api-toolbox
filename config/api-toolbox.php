@@ -20,5 +20,7 @@ return [
         Features::pagination(),
         Features::idempotency(),
         Features::negotiation(),
+        Features::preferences(),
+        Features::asyncOperations(),
     ],
 ];

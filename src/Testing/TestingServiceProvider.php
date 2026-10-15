@@ -10,11 +10,13 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Testing\TestResponse;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\Testing\Assertions\CacheControlAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\IdempotencyAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\LinkAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\NegotiationAssertions;
+use JustSteveKing\Toolbox\Testing\Assertions\PreferenceAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ProblemDetailsAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\RateLimitAssertions;
 use Pest\Expectation;
@@ -43,6 +45,10 @@ final class TestingServiceProvider extends ServiceProvider
 
         if ($features->enabled(Features::CONDITIONAL_REQUESTS)) {
             $this->conditionalRequests();
+        }
+
+        if ($features->enabled(Features::PREFERENCES) || $features->enabled(Features::ASYNC_OPERATIONS)) {
+            $this->preferences();
         }
 
         if ($features->enabled(Features::IDEMPOTENCY)) {
@@ -134,7 +140,35 @@ final class TestingServiceProvider extends ServiceProvider
         $this->expectation('toHaveETag', static fn (TestResponse $response, ?string $etag = null, ?bool $weak = null) => ConditionalRequestAssertions::assertETag($response, $etag, $weak));
         $this->expectation('toBeNotModified', static fn (TestResponse $response) => ConditionalRequestAssertions::assertNotModified($response));
         $this->expectation('toBePreconditionFailed', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionFailed($response));
+        TestResponse::macro('assertCacheControl', function (array $directives): TestResponse {
+            CacheControlAssertions::assertCacheControl($this, $directives);
+
+            return $this;
+        });
+
+        $this->expectation('toHaveCacheControl', static fn (TestResponse $response, array $directives) => CacheControlAssertions::assertCacheControl($response, $directives));
         $this->expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
+    }
+
+    private function preferences(): void
+    {
+        TestResponse::macro('assertPreferenceApplied', function (string $preference, ?string $value = null): TestResponse {
+            PreferenceAssertions::assertPreferenceApplied($this, $preference, $value);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertPreferenceNotApplied', function (string $preference): TestResponse {
+            PreferenceAssertions::assertPreferenceNotApplied($this, $preference);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertOperationAccepted', function (): string {
+            return PreferenceAssertions::assertOperationAccepted($this);
+        });
+
+        $this->expectation('toHavePreferenceApplied', static fn (TestResponse $response, string $preference, ?string $value = null) => PreferenceAssertions::assertPreferenceApplied($response, $preference, $value));
     }
 
     private function idempotency(EnabledFeatures $features): void

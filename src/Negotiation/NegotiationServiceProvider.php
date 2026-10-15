@@ -12,6 +12,7 @@ use Illuminate\Log\Context\Repository as Context;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
+use JustSteveKing\Toolbox\Contracts\RequestIdentifier;
 use JustSteveKing\Toolbox\Features;
 use JustSteveKing\Toolbox\Negotiation\Http\Middleware\AssignRequestId;
 use JustSteveKing\Toolbox\Negotiation\Http\Middleware\EnsureAcceptable;
@@ -28,9 +29,15 @@ final class NegotiationServiceProvider extends ServiceProvider
         $options = $this->options();
 
         $this->app->scoped(CurrentTrace::class);
+        $this->app->scoped(CurrentRequestId::class);
+
+        if (($options['request_id_header'] ?? self::DEFAULT_REQUEST_ID_HEADER) !== false) {
+            $this->app->bind(RequestIdentifier::class, CurrentRequestId::class);
+        }
 
         $this->app->bind(AssignRequestId::class, static fn (Application $app): AssignRequestId => new AssignRequestId(
             $app->make(Context::class),
+            $app->make(CurrentRequestId::class),
             is_string($options['request_id_header'] ?? null) ? $options['request_id_header'] : self::DEFAULT_REQUEST_ID_HEADER,
             ($options['trust_request_id'] ?? true) === true,
         ));

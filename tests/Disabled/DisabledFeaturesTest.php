@@ -85,7 +85,21 @@ it('registers no testing macros for disabled features', function (string $macro)
     'assertSunset', 'assertLinkHeader', 'assertNoLinkHeader',
     'assertETag', 'assertNotModified', 'assertPreconditionFailed', 'assertPreconditionRequired',
     'assertIdempotentReplay', 'assertRateLimitHeaders', 'assertTraceparent', 'assertRequestId',
+    'assertCacheControl', 'assertPreferenceApplied', 'assertPreferenceNotApplied', 'assertOperationAccepted',
 ]);
+
+it('registers no preferences alias or bindings', function (): void {
+    expect(app()->getProviders(JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider::class))->toBe([])
+        ->and(app()->bound(JustSteveKing\Toolbox\Contracts\ClientPreferences::class))->toBeFalse()
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKey('prefer');
+});
+
+it('registers no operations store or status monitor route', function (): void {
+    expect(app()->getProviders(JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider::class))->toBe([])
+        ->and(app()->bound(JustSteveKing\Toolbox\AsyncOperations\OperationStore::class))->toBeFalse()
+        ->and(app(Router::class)->getRoutes()->getByName('api-toolbox.operations.show'))->toBeNull()
+        ->and(app()->bound(JustSteveKing\Toolbox\Contracts\RequestIdentifier::class))->toBeFalse();
+});
 
 it('registers no negotiation aliases or global middleware, and adds no request ID or trace', function (): void {
     expect(app()->getProviders(NegotiationServiceProvider::class))->toBe([])

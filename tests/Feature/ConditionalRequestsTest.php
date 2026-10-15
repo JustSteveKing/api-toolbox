@@ -160,3 +160,15 @@ describe('preconditions.required', function (): void {
         $this->post('api/locked')->assertOk();
     });
 });
+
+describe('caching directives through Laravel\'s cache.headers', function (): void {
+    it('combines with conditional, which validates while cache.headers sets the directives', function (): void {
+        Route::get('api/cached/{document}', fn (Document $document) => ['title' => $document->title])
+            ->middleware([SubstituteBindings::class, 'conditional', 'cache.headers:public;max_age=60;stale_while_revalidate=30;stale_if_error=86400;immutable']);
+
+        $this->get('api/cached/1')
+            ->assertOk()
+            ->assertETag(currentTag())
+            ->assertCacheControl(['public', 'max-age' => 60, 'stale-while-revalidate' => 30, 'stale-if-error' => 86400, 'immutable']);
+    });
+});

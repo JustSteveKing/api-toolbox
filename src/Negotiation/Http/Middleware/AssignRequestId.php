@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as Context;
 use Illuminate\Support\Str;
+use JustSteveKing\Toolbox\Negotiation\CurrentRequestId;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
@@ -29,6 +30,7 @@ final readonly class AssignRequestId
 
     public function __construct(
         private Context $context,
+        private CurrentRequestId $current,
         private string $header = 'X-Request-Id',
         private bool $trustIncoming = true,
     ) {}
@@ -43,6 +45,7 @@ final readonly class AssignRequestId
 
         $request->headers->set($this->header, $id);
         $this->context->add(self::CONTEXT_KEY, $id);
+        $this->current->id = $id;
 
         $response = $next($request);
 

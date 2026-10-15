@@ -194,6 +194,33 @@ describe('negotiation assertions', function (): void {
     ])->throws(AssertionFailedError::class);
 });
 
+describe('cache-control and preference assertions', function (): void {
+    it('accept what is there', function (): void {
+        fakeResponse(headers: ['Cache-Control' => 'public, Max-Age=60, stale-while-revalidate="30", immutable'])
+            ->assertCacheControl(['public', 'max-age' => 60, 'stale-while-revalidate' => '30', 'immutable']);
+
+        fakeResponse(headers: ['Preference-Applied' => 'return=minimal, respond-async'])
+            ->assertPreferenceApplied('return', 'minimal')
+            ->assertPreferenceApplied('respond-async')
+            ->assertPreferenceNotApplied('handling');
+
+        expect(fakeResponse('{}', 202, ['Location' => '/operations/1', 'Retry-After' => '5'])->assertOperationAccepted())->toBe('/operations/1');
+    });
+
+    it('reject', function (Closure $assert): void {
+        $assert();
+    })->with([
+        'missing directive' => fn () => fakeResponse(headers: ['Cache-Control' => 'public'])->assertCacheControl(['immutable']),
+        'wrong value' => fn () => fakeResponse(headers: ['Cache-Control' => 'max-age=60'])->assertCacheControl(['max-age' => 30]),
+        'not applied' => fn () => fakeResponse()->assertPreferenceApplied('return'),
+        'other value' => fn () => fakeResponse(headers: ['Preference-Applied' => 'return=minimal'])->assertPreferenceApplied('return', 'representation'),
+        'applied when it should not be' => fn () => fakeResponse(headers: ['Preference-Applied' => 'respond-async'])->assertPreferenceNotApplied('respond-async'),
+        '202 without Location' => fn () => fakeResponse('{}', 202, ['Retry-After' => '5'])->assertOperationAccepted(),
+        '202 without Retry-After' => fn () => fakeResponse('{}', 202, ['Location' => '/o/1'])->assertOperationAccepted(),
+        'not a 202' => fn () => fakeResponse('{}', 200, ['Location' => '/o/1', 'Retry-After' => '5'])->assertOperationAccepted(),
+    ])->throws(AssertionFailedError::class);
+});
+
 describe('Pest expectations', function (): void {
     it('mirror the macros', function (): void {
         expect(fakeProblem(['type' => 'https://example.com/a', 'status' => 403]))
