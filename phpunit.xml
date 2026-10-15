@@ -16,6 +16,7 @@
             <directory>tests/Disabled</directory>
             <directory>tests/Override</directory>
             <directory>tests/Options</directory>
+            <directory>tests/Production</directory>
         </testsuite>
     </testsuites>
     <source>

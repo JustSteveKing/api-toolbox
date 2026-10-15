@@ -27,7 +27,7 @@ use JustSteveKing\Toolbox\Features;
 ],
 ```
 
-If you never publish the config, Problem Details is on with its defaults.
+If you never publish the config, Problem Details and Deprecation are on with their defaults.
 
 To check a feature at runtime:
 
@@ -165,6 +165,121 @@ domain-specific formats.
 
 Your own render callbacks in `withExceptions()` run first, so an application can always
 override what this package renders.
+
+## Deprecation and Sunset
+
+[RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) (Deprecation),
+[RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) (Sunset)
+
+A changelog entry saying an endpoint is deprecated reaches the people who read changelogs.
+These two headers reach every client that calls the endpoint, in a form a client library or
+gateway can act on.
+
+```php
+Features::deprecation([
+    'global' => true, // default: true
+]),
+```
+
+Mark a controller, or one action, with attributes:
+
+```php
+use JustSteveKing\Toolbox\Deprecation\Attributes\Deprecation;
+use JustSteveKing\Toolbox\Deprecation\Attributes\Sunset;
+
+#[Deprecation(at: '2026-06-30T23:59:59Z', link: 'https://docs.example.com/deprecations/orders-v1')]
+#[Sunset(at: '2027-01-01T00:00:00Z', link: 'https://docs.example.com/sunset-policy')]
+final class OrderController
+{
+    // ...
+}
+```
+
+```http
+Deprecation: @1782863999
+Sunset: Fri, 01 Jan 2027 00:00:00 GMT
+Link: <https://docs.example.com/deprecations/orders-v1>; rel="deprecation"
+Link: <https://docs.example.com/sunset-policy>; rel="sunset"
+```
+
+- An attribute on an action overrides the same attribute on its controller. The two kinds are
+  resolved separately, so a controller-wide `Sunset` can sit beside a per-action `Deprecation`.
+- A date without an offset is read as UTC. `at` on `Deprecation` can be in the future: section
+  2.1 says the date is when the resource "will be or has been deprecated".
+- `#[Deprecation(link: ...)]` with no date sends only the link. Section 3.1 describes this as
+  publishing a deprecation policy before anything is deprecated.
+- A sunset earlier than the deprecation throws. RFC 9745 section 4 says it MUST NOT be.
+- Links are appended to any `Link` the response already has, never replace it.
+- Error responses get the headers too, because both describe the resource, not the outcome of
+  one request.
+
+The attributes are named after the header fields because `#[Deprecated]` is taken: PHP 8.4's
+native `#[\Deprecated]` raises `E_USER_DEPRECATED` every time the method is called, which on a
+controller means on every request.
+
+Only controller routes are read, as with Laravel's own controller attributes. Closure routes are
+not, because `route:cache` serialises closures and their attributes cannot be relied on.
+
+With `global` on, the middleware runs on every request and does nothing for routes without
+attributes. With it off, add the `deprecation` middleware to the routes that need it.
+
+### Sunset dates
+
+RFC 8594 makes `Sunset` an HTTP-date, which RFC 9110 section 5.6.7 fixes as
+`Sun, 06 Nov 1994 08:49:37 GMT`. RFC 9745's own section 4 example writes
+`Sun, 30 Jun 2024 23:59:59 UTC`, which is not a valid HTTP-date. This package sends `GMT`, and
+`assertSunset()` rejects `UTC`.
+
+### Other sources
+
+Attributes are one source of deprecation information. To read it from somewhere else, such as a
+manifest shared with services in other languages, bind your own
+`JustSteveKing\Toolbox\Deprecation\Contracts\DeprecationSource`. It returns a `Notice` for a
+route, or null:
+
+```php
+use JustSteveKing\Toolbox\Deprecation\Notice;
+
+new Notice(
+    deprecatedAt: Notice::date('2026-06-30T23:59:59Z'),
+    deprecationLink: 'https://docs.example.com/deprecations/orders-v1',
+    sunsetAt: Notice::date('2027-01-01'),
+);
+```
+
+### Field-level deprecation
+
+Not supported. Both RFCs describe a resource, and no published standard puts the deprecation of
+a single field in a header. `Notice` has no dependency on routes, so whatever does eventually
+describe fields can produce it.
+
+## Testing
+
+Assertions for every enabled feature, on Laravel's `TestResponse` and as Pest expectations.
+They check the exact syntax each RFC specifies, not only that a header is present. They are
+registered only while the application is running its tests (`APP_ENV=testing`), and only for
+features that are enabled. The Pest expectations need Pest; the response macros work with
+PHPUnit alone.
+
+```php
+$this->getJson('/api/orders')
+    ->assertProblem(403)
+    ->assertProblemType('https://docs.example.com/problems/out-of-credit');
+
+expect($this->getJson('/api/orders'))->toBeProblem(403);
+```
+
+| Feature | Response macro | Pest expectation | Checks |
+|---|---|---|---|
+| Problem Details | `assertProblem(?status)` | `toBeProblem(?status)` | `application/problem+json`; a JSON object; member types; `status` matches the response (RFC 9457 §3.1.2) |
+| | `assertProblemType(type, ?status)` | `toHaveProblemType(type, ?status)` | The above, and the type. A missing type counts as `about:blank` (§3.1.1) |
+| Deprecation | `assertDeprecated(?at, ?link)` | `toBeDeprecated(?at, ?link)` | Exactly one `Deprecation` field, a Structured Field Date (RFC 9745 §2.1), and a `rel="deprecation"` link if given |
+| | `assertSunset(?at, ?link)` | `toHaveSunset(?at, ?link)` | Exactly one `Sunset` field, an IMF-fixdate in GMT (RFC 8594 §3), not earlier than `Deprecation` (RFC 9745 §4) |
+| | `assertNotDeprecated()` | | Neither field is present |
+| | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
+| | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
+
+Dates can be a `DateTimeInterface` or a string. A string without an offset is read as UTC.
 
 ## License
 

@@ -24,6 +24,8 @@ final class Features
 
     public const string PROBLEM_DETAILS = 'problem-details';
 
+    public const string DEPRECATION = 'deprecation';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -37,6 +39,20 @@ final class Features
     }
 
     /**
+     * Send Deprecation (RFC 9745) and Sunset (RFC 8594) headers for routes marked with
+     * #[Deprecation] and #[Sunset].
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9745
+     * @see https://www.rfc-editor.org/rfc/rfc8594
+     *
+     * @param  array{global?: bool}  $options
+     */
+    public static function deprecation(array $options = []): string
+    {
+        return self::withOptions(self::DEPRECATION, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -45,6 +61,7 @@ final class Features
     {
         return [
             self::PROBLEM_DETAILS,
+            self::DEPRECATION,
         ];
     }
 

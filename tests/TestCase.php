@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Tests;
 
+use Illuminate\Testing\TestResponse;
 use JustSteveKing\Toolbox\ApiToolboxServiceProvider;
 use JustSteveKing\Toolbox\Features;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -19,6 +20,17 @@ abstract class TestCase extends Orchestra
     protected function features(): array
     {
         return Features::all();
+    }
+
+    /**
+     * Macros are static, so without this a macro registered by one test case would still be
+     * there in the next, and the tests proving a disabled feature adds none would prove nothing.
+     */
+    protected function setUp(): void
+    {
+        TestResponse::flushMacros();
+
+        parent::setUp();
     }
 
     protected function getPackageProviders($app): array

@@ -15,5 +15,6 @@ use JustSteveKing\Toolbox\Features;
 return [
     'features' => [
         Features::problemDetails(),
+        Features::deprecation(),
     ],
 ];

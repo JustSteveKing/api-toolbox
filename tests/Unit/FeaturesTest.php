@@ -57,9 +57,11 @@ it('survives config:cache with the published stub', function (): void {
 
     $cached = eval('return '.var_export($config, true).';');
 
-    expect($cached['features'])->toBe(['problem-details'])
+    expect($cached['features'])->toBe(['problem-details', 'deprecation'])
         ->and(config(Features::OPTIONS_KEY.'.problem-details'))
-        ->toBe(['type_base_uri' => '/problems', 'paths' => ['api/*']]);
+        ->toBe(['type_base_uri' => '/problems', 'paths' => ['api/*']])
+        ->and(config(Features::OPTIONS_KEY.'.deprecation'))
+        ->toBe(['global' => true]);
 });
 
 it('merges a default config that carries no options, so it cannot overwrite the application\'s', function (): void {

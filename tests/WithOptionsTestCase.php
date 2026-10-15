@@ -15,6 +15,7 @@ abstract class WithOptionsTestCase extends TestCase
                 'type_base_uri' => 'https://docs.example.com/problems/',
                 'paths' => ['v1/*'],
             ]),
+            Features::deprecation(['global' => false]),
         ];
     }
 }

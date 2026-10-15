@@ -23,6 +23,10 @@ return [
             // Paths that always get problem details, whatever the request's Accept header.
             'paths' => ['api/*'],
         ]),
+        Features::deprecation([
+            // Run on every request; turn off to add the "deprecation" middleware per route instead.
+            'global' => true,
+        ]),
     ],
 
 ];

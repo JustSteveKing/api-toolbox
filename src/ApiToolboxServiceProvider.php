@@ -7,7 +7,9 @@ namespace JustSteveKing\Toolbox;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\ServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
+use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
+use JustSteveKing\Toolbox\Testing\TestingServiceProvider;
 
 /**
  * Registers each enabled feature's own provider and nothing else.
@@ -23,6 +25,7 @@ final class ApiToolboxServiceProvider extends ServiceProvider
      */
     private const array PROVIDERS = [
         Features::PROBLEM_DETAILS => ProblemDetailsServiceProvider::class,
+        Features::DEPRECATION => DeprecationServiceProvider::class,
     ];
 
     public function register(): void
@@ -39,6 +42,10 @@ final class ApiToolboxServiceProvider extends ServiceProvider
 
         foreach ($features->all() as $feature) {
             $this->app->register(self::PROVIDERS[$feature]);
+        }
+
+        if ($this->app->runningUnitTests()) {
+            $this->app->register(TestingServiceProvider::class);
         }
     }
 
