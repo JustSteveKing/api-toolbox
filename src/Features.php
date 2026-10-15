@@ -30,6 +30,10 @@ final class Features
 
     public const string PAGINATION = 'pagination';
 
+    public const string IDEMPOTENCY = 'idempotency';
+
+    public const string RATE_LIMIT_HEADERS = 'rate-limit-headers';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -82,6 +86,38 @@ final class Features
     }
 
     /**
+     * Makes POST and PATCH safe to retry with an Idempotency-Key, through the "idempotent"
+     * middleware.
+     *
+     * Built on draft-ietf-httpapi-idempotency-key-header-07, which expired on 2026-04-18 without
+     * becoming an RFC. Supported, not experimental: the header's shape has been stable through
+     * every revision and is in wide use.
+     *
+     * @see https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
+     *
+     * @param  array{ttl?: int, store?: string, lock?: int, retry_after?: int, documentation?: string}  $options
+     */
+    public static function idempotency(array $options = []): string
+    {
+        return self::withOptions(self::IDEMPOTENCY, $options);
+    }
+
+    /**
+     * Experimental: built on draft-ietf-httpapi-ratelimit-headers-11, which can still change.
+     * Breaking changes to this feature are allowed in minor releases.
+     *
+     * Adds RateLimit and RateLimit-Policy to responses from Laravel's own throttle middleware.
+     *
+     * @see https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+     *
+     * @param  array{legacy_headers?: bool}  $options
+     */
+    public static function rateLimitHeaders(array $options = []): string
+    {
+        return self::withOptions(self::RATE_LIMIT_HEADERS, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -93,6 +129,8 @@ final class Features
             self::DEPRECATION,
             self::CONDITIONAL_REQUESTS,
             self::PAGINATION,
+            self::IDEMPOTENCY,
+            self::RATE_LIMIT_HEADERS,
         ];
     }
 

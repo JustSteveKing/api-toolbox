@@ -9,8 +9,10 @@ use Illuminate\Support\ServiceProvider;
 use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
+use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
+use JustSteveKing\Toolbox\RateLimitHeaders\RateLimitHeadersServiceProvider;
 use JustSteveKing\Toolbox\Testing\TestingServiceProvider;
 
 /**
@@ -30,6 +32,8 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::DEPRECATION => DeprecationServiceProvider::class,
         Features::CONDITIONAL_REQUESTS => ConditionalRequestsServiceProvider::class,
         Features::PAGINATION => PaginationServiceProvider::class,
+        Features::IDEMPOTENCY => IdempotencyServiceProvider::class,
+        Features::RATE_LIMIT_HEADERS => RateLimitHeadersServiceProvider::class,
     ];
 
     public function register(): void

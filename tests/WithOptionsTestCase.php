@@ -17,6 +17,12 @@ abstract class WithOptionsTestCase extends TestCase
                 'apiguide' => false,
             ]),
             Features::deprecation(['global' => false]),
+            Features::idempotency([
+                'ttl' => 60,
+                'retry_after' => 5,
+                'documentation' => 'https://docs.example.com/idempotency',
+            ]),
+            Features::rateLimitHeaders(['legacy_headers' => false]),
         ];
     }
 }

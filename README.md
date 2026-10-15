@@ -406,6 +406,132 @@ instead, typed `https://apiguide.dev/errors/invalid-pagination-cursor`, for ever
 paginator in the application, before any query runs. A missing or empty cursor is still the first
 page.
 
+## Idempotency
+
+[draft-ietf-httpapi-idempotency-key-header-07](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
+
+A client posts a payment, the connection drops, and it cannot tell whether the charge went
+through. Retrying might charge twice; not retrying might charge never. With an `Idempotency-Key`,
+the retry gets the original result instead of running again.
+
+The draft expired on 2026-04-18 without becoming an RFC. This feature is supported anyway, not
+experimental: the header has kept the same shape through every revision and is widely used.
+
+```php
+Features::idempotency([
+    'ttl' => 86400,          // seconds a result is kept, and so how long a key is valid
+    'store' => null,         // cache store; it must support atomic locks
+    'lock' => 60,            // longest a request is treated as in flight
+    'retry_after' => 1,      // Retry-After on a 409
+    'documentation' => null, // URL linked from a 400, as the draft's example does
+]),
+```
+
+```php
+Route::post('charges', CreateCharge::class)->middleware('idempotent');           // honoured when sent
+Route::post('payouts', CreatePayout::class)->middleware('idempotent:required');  // 400 when missing
+```
+
+```http
+POST /charges HTTP/1.1
+Idempotency-Key: "8e03978e-40d5-43e8-bc93-6894a57f9324"
+```
+
+| Situation | Response |
+|---|---|
+| First request with a key | Runs as normal; the response is stored |
+| Retry, same payload | The stored response, unchanged, without running the action again |
+| Same key, different payload | 422, `https://apiguide.dev/errors/idempotency-key-conflict` |
+| Retry while the first is still running | 409, the same type, with `Retry-After` |
+| No key, `idempotent:required` | 400, linked to `documentation` if set |
+| Malformed key | 400 |
+
+The draft (section 2.5.2) says an API MUST publish its idempotency policy, including how long
+keys last. Put your `ttl` in your API documentation.
+
+- **Both key forms work.** Section 2.1 makes the key a quoted Structured Field String.
+  Widely used clients send it bare. `"abc"` and `abc` are the same key.
+- **Keys are scoped** to the authenticated user, or to the client address when there is none, so
+  two clients cannot collide on the same key. The middleware runs after authentication for this
+  reason, wherever the route lists it.
+- **The fingerprint** is a hash of the method, path and query, and the whole body. That's one of
+  the approaches section 2.4 lists. The same key sent to another endpoint is a different request
+  (422), not a retry.
+- **Only POST and PATCH.** The other methods are idempotent already.
+- **Errors are stored and replayed** too, as section 2.6 says: a retry of a request that failed
+  validation fails the same way. Two exceptions: a 5xx is not stored, so a request that failed on
+  the server can be retried, which is the point of the key; nor is a 429, because the request
+  never ran.
+- **A replay is the stored response** with its original status, headers and body, minus `Date`
+  and cookies. No header marks it as a replay: the draft defines none.
+- **The cache store has to support atomic locks**, which is how a concurrent retry is told apart
+  from a completed one. Redis, Memcached, database, file, DynamoDB and array do. APC, session and
+  storage stores do not, and nor does the null store in practice, since it keeps nothing. The
+  package refuses all of those rather than fail open.
+
+## RateLimit headers (experimental)
+
+[draft-ietf-httpapi-ratelimit-headers-11](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)
+
+**Experimental.** Built on an IETF draft that can still change. Breaking changes to this
+feature are allowed in minor releases. Pin a minor version if you rely on it.
+
+Laravel tells a client its rate limit through `X-RateLimit-*` headers that no standard defines.
+A client only finds out the window when it hits a 429. The draft's two fields describe the policy
+and the current state in a form any client can parse.
+
+```php
+Features::rateLimitHeaders([
+    'legacy_headers' => true, // keep Laravel's X-RateLimit-* alongside
+]),
+```
+
+Nothing changes in your routes. Laravel's `throttle` middleware and rate limiters work as before;
+the responses gain two fields:
+
+```php
+RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+```
+
+```http
+RateLimit-Policy: "api";q=60;w=60
+RateLimit: "api";r=59;t=60
+```
+
+And on a 429:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/problem+json
+Retry-After: 42
+RateLimit-Policy: "api";q=60;w=60
+RateLimit: "api";r=0;t=42
+Cache-Control: no-store, private
+
+{"type":"https://apiguide.dev/errors/rate-limit-exceeded","title":"Rate Limit Exceeded","status":429,"detail":"Too Many Attempts."}
+```
+
+- The policy name is the limiter's name. A limiter that returns several limits gets one policy
+  each, numbered: `"layered-1"`, `"layered-2"`. `throttle:60,1` has no name and is `"default"`.
+- `q` is the limit, `w` its window in seconds, `r` what is left and `t` the seconds until the
+  window resets. `t` is left out before a window has started.
+- `pk`, the partition key, is never sent. Section 6.1 says to avoid partition keys that carry
+  sensitive information, and Laravel's are user identifiers and IP addresses.
+- `Retry-After` is the end of the effective window, never earlier, as section 6 requires.
+- A 429 carries `Cache-Control: no-store`, because RFC 6585 section 4 says it MUST NOT be stored
+  by a cache.
+- The 429 is typed `rate-limit-exceeded`, for a short window that protects capacity.
+  apiguide.dev's `quota-exceeded` is for a billing-period allowance. Use it, through a
+  `ProblemException`, if that is what your limit is.
+
+This works by binding Laravel's `ThrottleRequests` middleware to a subclass in the container.
+`ThrottleRequestsWithRedis`, which an application opts into with `throttleWithRedis()`, is not
+covered.
+
+The draft does not say whether the policy item in `RateLimit` (section 4) must be a String the way
+section 3 requires for `RateLimit-Policy`. Every example uses one, and the same name has to
+identify the same policy in both, so this package always sends a String.
+
 ## Testing
 
 Assertions for every enabled feature, on Laravel's `TestResponse` and as Pest expectations.
@@ -433,6 +559,8 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | | `assertNotModified()` | `toBeNotModified()` | 304 with no content (RFC 9110 §15.4.5) |
 | | `assertPreconditionFailed()` | `toBePreconditionFailed()` | 412 |
 | | `assertPreconditionRequired()` | `toBePreconditionRequired()` | 428 that explains itself and carries `no-store` (RFC 6585 §3) |
+| Idempotency | `assertIdempotentReplay(original)` | `toBeIdempotentReplayOf(original)` | The same status, content and headers as the original response, other than `Date` and cookies (draft §2.6) |
+| RateLimit headers | `assertRateLimitHeaders(?policy, ?remaining)` | `toHaveRateLimitHeaders(?policy, ?remaining)` | Both fields parse as RFC 9651 Lists with the draft's parameters and types (draft §3, §4), and describe the policy if given |
 | Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 

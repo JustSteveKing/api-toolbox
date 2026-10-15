@@ -12,8 +12,10 @@ use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Features;
 use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
+use JustSteveKing\Toolbox\Testing\Assertions\IdempotencyAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\LinkAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ProblemDetailsAssertions;
+use JustSteveKing\Toolbox\Testing\Assertions\RateLimitAssertions;
 use Pest\Expectation;
 use PHPUnit\Framework\Assert;
 
@@ -40,6 +42,14 @@ final class TestingServiceProvider extends ServiceProvider
 
         if ($features->enabled(Features::CONDITIONAL_REQUESTS)) {
             $this->conditionalRequests();
+        }
+
+        if ($features->enabled(Features::IDEMPOTENCY)) {
+            $this->idempotency();
+        }
+
+        if ($features->enabled(Features::RATE_LIMIT_HEADERS)) {
+            $this->rateLimitHeaders();
         }
 
         // Link headers come from more than one feature.
@@ -120,6 +130,28 @@ final class TestingServiceProvider extends ServiceProvider
         $this->expectation('toBeNotModified', static fn (TestResponse $response) => ConditionalRequestAssertions::assertNotModified($response));
         $this->expectation('toBePreconditionFailed', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionFailed($response));
         $this->expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
+    }
+
+    private function idempotency(): void
+    {
+        TestResponse::macro('assertIdempotentReplay', function (TestResponse $original): TestResponse {
+            IdempotencyAssertions::assertIdempotentReplay($this, $original);
+
+            return $this;
+        });
+
+        $this->expectation('toBeIdempotentReplayOf', static fn (TestResponse $response, TestResponse $original) => IdempotencyAssertions::assertIdempotentReplay($response, $original));
+    }
+
+    private function rateLimitHeaders(): void
+    {
+        TestResponse::macro('assertRateLimitHeaders', function (?string $policy = null, ?int $remaining = null): TestResponse {
+            RateLimitAssertions::assertRateLimitHeaders($this, $policy, $remaining);
+
+            return $this;
+        });
+
+        $this->expectation('toHaveRateLimitHeaders', static fn (TestResponse $response, ?string $policy = null, ?int $remaining = null) => RateLimitAssertions::assertRateLimitHeaders($response, $policy, $remaining));
     }
 
     private function links(): void

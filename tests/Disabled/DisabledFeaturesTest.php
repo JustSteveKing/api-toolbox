@@ -6,6 +6,7 @@ use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
@@ -17,11 +18,14 @@ use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
 use JustSteveKing\Toolbox\Deprecation\Http\Middleware\AddDeprecationHeaders;
 use JustSteveKing\Toolbox\Facades\ApiToolbox;
 use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
+use JustSteveKing\Toolbox\Idempotency\IdempotencyStore;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemFactory;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemRenderer;
+use JustSteveKing\Toolbox\RateLimitHeaders\RateLimitHeadersServiceProvider;
 use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\LegacyOrdersController;
 use JustSteveKing\Toolbox\Tests\Fixtures\OutOfCredit;
 
@@ -73,7 +77,19 @@ it('registers no testing macros for disabled features', function (string $macro)
     'assertProblem', 'assertProblemType', 'assertDeprecated', 'assertNotDeprecated',
     'assertSunset', 'assertLinkHeader', 'assertNoLinkHeader',
     'assertETag', 'assertNotModified', 'assertPreconditionFailed', 'assertPreconditionRequired',
+    'assertIdempotentReplay', 'assertRateLimitHeaders',
 ]);
+
+it('registers no idempotency alias, binding or priority', function (): void {
+    expect(app()->getProviders(IdempotencyServiceProvider::class))->toBe([])
+        ->and(app()->bound(IdempotencyStore::class))->toBeFalse()
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKey('idempotent');
+});
+
+it('leaves Laravel\'s throttle middleware in place', function (): void {
+    expect(app()->getProviders(RateLimitHeadersServiceProvider::class))->toBe([])
+        ->and(app(ThrottleRequests::class)::class)->toBe(ThrottleRequests::class);
+});
 
 it('registers no conditional request aliases, group or middleware priority', function (): void {
     $router = app(Router::class);

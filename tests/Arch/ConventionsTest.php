@@ -31,6 +31,8 @@ $features = [
     'JustSteveKing\Toolbox\Deprecation',
     'JustSteveKing\Toolbox\ConditionalRequests',
     'JustSteveKing\Toolbox\Pagination',
+    'JustSteveKing\Toolbox\Idempotency',
+    'JustSteveKing\Toolbox\RateLimitHeaders',
 ];
 
 foreach ($features as $feature) {

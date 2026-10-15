@@ -127,6 +127,50 @@ describe('conditional request assertions', function (): void {
     ])->throws(AssertionFailedError::class);
 });
 
+describe('idempotency and rate limit assertions', function (): void {
+    it('accepts an identical replay, ignoring Date', function (): void {
+        $original = fakeResponse('{"id":1}', 201, ['Location' => '/a/1', 'Date' => 'Thu, 15 Oct 2026 09:00:00 GMT']);
+        $replay = fakeResponse('{"id":1}', 201, ['Location' => '/a/1', 'Date' => 'Thu, 15 Oct 2026 09:00:05 GMT']);
+
+        $replay->assertIdempotentReplay($original);
+        expect($replay)->toBeIdempotentReplayOf($original);
+    });
+
+    it('rejects what is not a replay', function (Closure $assert): void {
+        $assert();
+    })->with([
+        'different status' => fn () => fakeResponse('{"id":1}', 200)->assertIdempotentReplay(fakeResponse('{"id":1}', 201)),
+        'different content' => fn () => fakeResponse('{"id":2}', 201)->assertIdempotentReplay(fakeResponse('{"id":1}', 201)),
+        'missing header' => fn () => fakeResponse('{"id":1}', 201)->assertIdempotentReplay(fakeResponse('{"id":1}', 201, ['Location' => '/a/1'])),
+    ])->throws(AssertionFailedError::class);
+
+    it('accepts valid RateLimit fields', function (): void {
+        $response = fakeResponse(headers: [
+            'RateLimit-Policy' => '"burst";q=100;w=60, "daily";q=1000;w=86400;qu="requests";pk=:cHsdsRa894==:',
+            'RateLimit' => '"burst";r=50;t=30, "daily";r=999',
+        ]);
+
+        $response->assertRateLimitHeaders()->assertRateLimitHeaders('burst', remaining: 50);
+        expect($response)->toHaveRateLimitHeaders('daily', 999);
+    });
+
+    it('rejects invalid RateLimit fields', function (array $headers, ?string $policy = null, ?int $remaining = null): void {
+        fakeResponse(headers: $headers)->assertRateLimitHeaders($policy, $remaining);
+    })->with([
+        'no fields' => [[]],
+        'policy only' => [['RateLimit-Policy' => '"a";q=1']],
+        'policy as a token' => [['RateLimit-Policy' => 'a;q=1', 'RateLimit' => '"a";r=1']],
+        'no q' => [['RateLimit-Policy' => '"a";w=60', 'RateLimit' => '"a";r=1']],
+        'zero window' => [['RateLimit-Policy' => '"a";q=1;w=0', 'RateLimit' => '"a";r=1']],
+        'negative remaining' => [['RateLimit-Policy' => '"a";q=1', 'RateLimit' => '"a";r=-1']],
+        'no r' => [['RateLimit-Policy' => '"a";q=1', 'RateLimit' => '"a";t=1']],
+        'pk not bytes' => [['RateLimit-Policy' => '"a";q=1;pk="user"', 'RateLimit' => '"a";r=1']],
+        'old draft syntax' => [['RateLimit-Policy' => '100;w=60', 'RateLimit' => 'limit=100, remaining=50, reset=30']],
+        'missing policy' => [['RateLimit-Policy' => '"a";q=1', 'RateLimit' => '"a";r=1'], 'b'],
+        'wrong remaining' => [['RateLimit-Policy' => '"a";q=5', 'RateLimit' => '"a";r=1'], 'a', 4],
+    ])->throws(AssertionFailedError::class);
+});
+
 describe('Pest expectations', function (): void {
     it('mirror the macros', function (): void {
         expect(fakeProblem(['type' => 'https://example.com/a', 'status' => 403]))

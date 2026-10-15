@@ -18,5 +18,6 @@ return [
         Features::deprecation(),
         Features::conditionalRequests(),
         Features::pagination(),
+        Features::idempotency(),
     ],
 ];

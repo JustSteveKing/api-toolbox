@@ -31,6 +31,13 @@ return [
         ]),
         Features::conditionalRequests(),
         Features::pagination(),
+        Features::idempotency([
+            // Seconds a completed response is kept for replay, and so how long a key is valid.
+            // The draft (section 2.5.2) says to publish this in your API documentation.
+            'ttl' => 86400,
+        ]),
+        // Experimental: built on an IETF draft that can still change.
+        // Features::rateLimitHeaders(),
     ],
 
 ];
