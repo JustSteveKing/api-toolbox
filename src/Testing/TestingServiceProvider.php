@@ -25,6 +25,10 @@ use PHPUnit\Framework\Assert;
 /**
  * TestResponse macros and Pest expectations for each enabled feature.
  *
+ * Macros and expectations live in static registries that outlast the application. Every closure
+ * put there is created in a static method, so it holds no reference to this provider and, through
+ * it, to the application: Laravel and Pest bind $this when they call it.
+ *
  * Registered only while the application runs its tests, and only for features that are enabled,
  * so a disabled feature adds no macros here either. Pest expectations are added when Pest is
  * installed; the macros work with PHPUnit alone.
@@ -36,40 +40,40 @@ final class TestingServiceProvider extends ServiceProvider
         $features = $this->app->make(EnabledFeatures::class);
 
         if ($features->enabled(Features::PROBLEM_DETAILS)) {
-            $this->problemDetails();
+            self::problemDetails();
         }
 
         if ($features->enabled(Features::DEPRECATION)) {
-            $this->deprecation();
+            self::deprecation();
         }
 
         if ($features->enabled(Features::CONDITIONAL_REQUESTS)) {
-            $this->conditionalRequests();
+            self::conditionalRequests();
         }
 
         if ($features->enabled(Features::PREFERENCES) || $features->enabled(Features::ASYNC_OPERATIONS)) {
-            $this->preferences();
+            self::preferences();
         }
 
         if ($features->enabled(Features::IDEMPOTENCY)) {
-            $this->idempotency($features);
+            self::idempotency($features);
         }
 
         if ($features->enabled(Features::RATE_LIMIT_HEADERS)) {
-            $this->rateLimitHeaders();
+            self::rateLimitHeaders();
         }
 
         if ($features->enabled(Features::NEGOTIATION)) {
-            $this->negotiation($features);
+            self::negotiation($features);
         }
 
         // Link headers come from more than one feature.
         if ($features->enabled(Features::DEPRECATION) || $features->enabled(Features::PAGINATION)) {
-            $this->links();
+            self::links();
         }
     }
 
-    private function problemDetails(): void
+    private static function problemDetails(): void
     {
         TestResponse::macro('assertProblem', function (?int $status = null): TestResponse {
             ProblemDetailsAssertions::assertProblem($this, $status);
@@ -83,11 +87,11 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toBeProblem', static fn (TestResponse $response, ?int $status = null) => ProblemDetailsAssertions::assertProblem($response, $status));
-        $this->expectation('toHaveProblemType', static fn (TestResponse $response, string $type, ?int $status = null) => ProblemDetailsAssertions::assertProblemType($response, $type, $status));
+        self::expectation('toBeProblem', static fn (TestResponse $response, ?int $status = null) => ProblemDetailsAssertions::assertProblem($response, $status));
+        self::expectation('toHaveProblemType', static fn (TestResponse $response, string $type, ?int $status = null) => ProblemDetailsAssertions::assertProblemType($response, $type, $status));
     }
 
-    private function deprecation(): void
+    private static function deprecation(): void
     {
         TestResponse::macro('assertDeprecated', function (DateTimeInterface|string|null $at = null, ?string $link = null): TestResponse {
             DeprecationAssertions::assertDeprecated($this, $at, $link);
@@ -107,11 +111,11 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toBeDeprecated', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertDeprecated($response, $at, $link));
-        $this->expectation('toHaveSunset', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertSunset($response, $at, $link));
+        self::expectation('toBeDeprecated', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertDeprecated($response, $at, $link));
+        self::expectation('toHaveSunset', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertSunset($response, $at, $link));
     }
 
-    private function conditionalRequests(): void
+    private static function conditionalRequests(): void
     {
         TestResponse::macro('assertETag', function (?string $etag = null, ?bool $weak = null): TestResponse {
             ConditionalRequestAssertions::assertETag($this, $etag, $weak);
@@ -137,20 +141,20 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toHaveETag', static fn (TestResponse $response, ?string $etag = null, ?bool $weak = null) => ConditionalRequestAssertions::assertETag($response, $etag, $weak));
-        $this->expectation('toBeNotModified', static fn (TestResponse $response) => ConditionalRequestAssertions::assertNotModified($response));
-        $this->expectation('toBePreconditionFailed', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionFailed($response));
+        self::expectation('toHaveETag', static fn (TestResponse $response, ?string $etag = null, ?bool $weak = null) => ConditionalRequestAssertions::assertETag($response, $etag, $weak));
+        self::expectation('toBeNotModified', static fn (TestResponse $response) => ConditionalRequestAssertions::assertNotModified($response));
+        self::expectation('toBePreconditionFailed', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionFailed($response));
         TestResponse::macro('assertCacheControl', function (array $directives): TestResponse {
             CacheControlAssertions::assertCacheControl($this, $directives);
 
             return $this;
         });
 
-        $this->expectation('toHaveCacheControl', static fn (TestResponse $response, array $directives) => CacheControlAssertions::assertCacheControl($response, $directives));
-        $this->expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
+        self::expectation('toHaveCacheControl', static fn (TestResponse $response, array $directives) => CacheControlAssertions::assertCacheControl($response, $directives));
+        self::expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
     }
 
-    private function preferences(): void
+    private static function preferences(): void
     {
         TestResponse::macro('assertPreferenceApplied', function (string $preference, ?string $value = null): TestResponse {
             PreferenceAssertions::assertPreferenceApplied($this, $preference, $value);
@@ -168,10 +172,10 @@ final class TestingServiceProvider extends ServiceProvider
             return PreferenceAssertions::assertOperationAccepted($this);
         });
 
-        $this->expectation('toHavePreferenceApplied', static fn (TestResponse $response, string $preference, ?string $value = null) => PreferenceAssertions::assertPreferenceApplied($response, $preference, $value));
+        self::expectation('toHavePreferenceApplied', static fn (TestResponse $response, string $preference, ?string $value = null) => PreferenceAssertions::assertPreferenceApplied($response, $preference, $value));
     }
 
-    private function idempotency(EnabledFeatures $features): void
+    private static function idempotency(EnabledFeatures $features): void
     {
         // A replay is a new message, so it carries its own request ID.
         $requestId = $features->enabled(Features::NEGOTIATION)
@@ -185,10 +189,10 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toBeIdempotentReplayOf', static fn (TestResponse $response, TestResponse $original) => IdempotencyAssertions::assertIdempotentReplay($response, $original, $perMessage));
+        self::expectation('toBeIdempotentReplayOf', static fn (TestResponse $response, TestResponse $original) => IdempotencyAssertions::assertIdempotentReplay($response, $original, $perMessage));
     }
 
-    private function rateLimitHeaders(): void
+    private static function rateLimitHeaders(): void
     {
         TestResponse::macro('assertRateLimitHeaders', function (?string $policy = null, ?int $remaining = null): TestResponse {
             RateLimitAssertions::assertRateLimitHeaders($this, $policy, $remaining);
@@ -196,10 +200,10 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toHaveRateLimitHeaders', static fn (TestResponse $response, ?string $policy = null, ?int $remaining = null) => RateLimitAssertions::assertRateLimitHeaders($response, $policy, $remaining));
+        self::expectation('toHaveRateLimitHeaders', static fn (TestResponse $response, ?string $policy = null, ?int $remaining = null) => RateLimitAssertions::assertRateLimitHeaders($response, $policy, $remaining));
     }
 
-    private function negotiation(EnabledFeatures $features): void
+    private static function negotiation(EnabledFeatures $features): void
     {
         $header = $features->options(Features::NEGOTIATION)['request_id_header'] ?? 'X-Request-Id';
         $header = is_string($header) ? $header : 'X-Request-Id';
@@ -216,11 +220,11 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toHaveTraceparent', static fn (TestResponse $response, ?string $traceId = null) => NegotiationAssertions::assertTraceparent($response, $traceId));
-        $this->expectation('toHaveRequestId', static fn (TestResponse $response, ?string $id = null) => NegotiationAssertions::assertRequestId($response, $header, $id));
+        self::expectation('toHaveTraceparent', static fn (TestResponse $response, ?string $traceId = null) => NegotiationAssertions::assertTraceparent($response, $traceId));
+        self::expectation('toHaveRequestId', static fn (TestResponse $response, ?string $id = null) => NegotiationAssertions::assertRequestId($response, $header, $id));
     }
 
-    private function links(): void
+    private static function links(): void
     {
         TestResponse::macro('assertLinkHeader', function (string $rel, ?string $uri = null): TestResponse {
             LinkAssertions::assertLinkHeader($this, $rel, $uri);
@@ -234,14 +238,14 @@ final class TestingServiceProvider extends ServiceProvider
             return $this;
         });
 
-        $this->expectation('toHaveLink', static fn (TestResponse $response, string $rel, ?string $uri = null) => LinkAssertions::assertLinkHeader($response, $rel, $uri));
+        self::expectation('toHaveLink', static fn (TestResponse $response, string $rel, ?string $uri = null) => LinkAssertions::assertLinkHeader($response, $rel, $uri));
     }
 
     /**
      * Adds a Pest expectation whose value must be a TestResponse. $assertion takes the response
      * and then whatever arguments the expectation was called with.
      */
-    private function expectation(string $name, Closure $assertion): void
+    private static function expectation(string $name, Closure $assertion): void
     {
         if (! class_exists(Expectation::class)) {
             return;

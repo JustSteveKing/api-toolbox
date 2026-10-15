@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Pagination;
 
+use Illuminate\Container\Container;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Pagination\CursorPaginator;
@@ -19,10 +20,10 @@ final class PaginationServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $app = $this->app;
-
-        CursorPaginator::currentCursorResolver(static function (string $name = 'cursor') use ($app): ?Cursor {
-            $request = $app->make('request');
+        // The resolver is static and outlives the application, so it looks the request up when it
+        // runs rather than holding on to the application that registered it.
+        CursorPaginator::currentCursorResolver(static function (string $name = 'cursor'): ?Cursor {
+            $request = Container::getInstance()->make('request');
             $value = $request instanceof Request ? $request->input($name) : null;
 
             if ($value === null || $value === '') {

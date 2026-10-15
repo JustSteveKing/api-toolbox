@@ -11,6 +11,9 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="Memory">
+            <directory>tests/Memory</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
             <directory>tests/Disabled</directory>
@@ -20,8 +23,13 @@
         </testsuite>
     </testsuites>
     <php>
-        <!-- Each test boots a fresh application; the suite outgrows PHP's 128M default. -->
-        <ini name="memory_limit" value="512M"/>
+        <!--
+            The suite peaked at 137M (PHP 8.5) and 125M (PHP 8.3, lowest) on 2026-10-15: past PHP's
+            128M default. The growth is the test framework keeping every finished test, not the
+            package, which tests/Memory proves boots repeatedly without keeping applications alive.
+            256M is twice the peak: room to grow, and still small enough that a leak fails the run.
+        -->
+        <ini name="memory_limit" value="256M"/>
     </php>
     <source>
         <include>
