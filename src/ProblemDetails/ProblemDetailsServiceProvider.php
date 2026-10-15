@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace JustSteveKing\Toolbox\ProblemDetails;
+
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\ServiceProvider;
+use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
+use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
+use Throwable;
+
+final class ProblemDetailsServiceProvider extends ServiceProvider
+{
+    public const array DEFAULT_PATHS = ['api/*'];
+
+    public function register(): void
+    {
+        $options = $this->app->make(EnabledFeatures::class)->options(Features::PROBLEM_DETAILS);
+
+        $baseUri = $options['type_base_uri'] ?? BaseUriTypeResolver::DEFAULT_BASE;
+        $paths = $options['paths'] ?? self::DEFAULT_PATHS;
+
+        $this->app->singleton(TypeResolver::class, static fn (): TypeResolver => new BaseUriTypeResolver(
+            is_string($baseUri) ? $baseUri : BaseUriTypeResolver::DEFAULT_BASE,
+        ));
+
+        // Bound rather than shared so app.debug is read when an exception is rendered, not once.
+        $this->app->bind(ProblemFactory::class, static function (Application $app): ProblemFactory {
+            /** @var Repository $config */
+            $config = $app->make('config');
+
+            return new ProblemFactory($app->make(TypeResolver::class), (bool) $config->get('app.debug'));
+        });
+
+        $this->app->bind(ProblemRenderer::class, static fn (Application $app): ProblemRenderer => new ProblemRenderer(
+            $app->make(ProblemFactory::class),
+            is_array($paths) ? array_values(array_filter($paths, is_string(...))) : [],
+        ));
+    }
+
+    /**
+     * Render callbacks run in registration order and the first non-null response wins. The
+     * application's own withExceptions() callbacks are registered before any package provider
+     * boots, so an application can always override what this renders.
+     */
+    public function boot(): void
+    {
+        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
+            if (! $handler instanceof Handler) {
+                return;
+            }
+
+            $handler->renderable(
+                fn (Throwable $e, Request $request): ?JsonResponse => $this->app->make(ProblemRenderer::class)->render($e, $request),
+            );
+        });
+    }
+}

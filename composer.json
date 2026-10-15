@@ -1,0 +1,65 @@
+{
+    "name": "juststeveking/api-toolbox",
+    "description": "Standards-compliant APIs in Laravel, one RFC at a time.",
+    "keywords": [
+        "laravel",
+        "api",
+        "http",
+        "rfc",
+        "problem-details",
+        "rfc9457"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Steve McDougall",
+            "email": "steve@juststeveking.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^13.30"
+    },
+    "autoload": {
+        "psr-4": {
+            "JustSteveKing\\Toolbox\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JustSteveKing\\Toolbox\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "JustSteveKing\\Toolbox\\ApiToolboxServiceProvider"
+            ],
+            "aliases": {
+                "ApiToolbox": "JustSteveKing\\Toolbox\\Facades\\ApiToolbox"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require-dev": {
+        "larastan/larastan": "^3.13",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.1 || ^5.0",
+        "pestphp/pest-plugin-laravel": "^4.0 || ^5.0"
+    },
+    "scripts": {
+        "test": "pest",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "format": "pint",
+        "lint": "pint --test"
+    }
+}

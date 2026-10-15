@@ -1,0 +1,14 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: max
+    # Laravel 13's floor. Catches syntax and functions newer than 8.3 on a newer local PHP.
+    phpVersion: 80300
+    paths:
+        - src
+        - config
+        - stubs
+    # Public constructors check their input at runtime even where the PHPDoc already narrows
+    # it, because callers are applications that PHPStan never sees.
+    treatPhpDocTypesAsCertain: false
