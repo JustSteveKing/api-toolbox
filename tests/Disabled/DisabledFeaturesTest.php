@@ -102,6 +102,15 @@ it('registers no preferences alias or bindings', function (): void {
         ->and(app(Router::class)->getMiddleware())->not->toHaveKey('prefer');
 });
 
+it('registers no API catalog route, binding or alias', function (): void {
+    expect(app()->getProviders(JustSteveKing\Toolbox\ApiCatalog\ApiCatalogServiceProvider::class))->toBe([])
+        ->and(app()->bound(JustSteveKing\Toolbox\ApiCatalog\Contracts\CatalogSource::class))->toBeFalse()
+        ->and(app(Router::class)->getRoutes()->getByName('api-toolbox.api-catalog'))->toBeNull()
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKey('api-catalog.link');
+
+    $this->get('/.well-known/api-catalog')->assertNotFound();
+});
+
 it('registers no operations store or status monitor route', function (): void {
     expect(app()->getProviders(JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider::class))->toBe([])
         ->and(app()->bound(JustSteveKing\Toolbox\AsyncOperations\OperationStore::class))->toBeFalse()

@@ -6,6 +6,7 @@ namespace JustSteveKing\Toolbox;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\ServiceProvider;
+use JustSteveKing\Toolbox\ApiCatalog\ApiCatalogServiceProvider;
 use JustSteveKing\Toolbox\AsyncOperations\AsyncOperationsServiceProvider;
 use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
@@ -46,6 +47,7 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::MERGE_PATCH => MergePatchServiceProvider::class,
         Features::DIGESTS => DigestServiceProvider::class,
         Features::MESSAGE_SIGNATURES => MessageSignaturesServiceProvider::class,
+        Features::API_CATALOG => ApiCatalogServiceProvider::class,
     ];
 
     public function register(): void

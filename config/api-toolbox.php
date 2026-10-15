@@ -25,5 +25,6 @@ return [
         Features::mergePatch(),
         Features::digests(),
         Features::messageSignatures(),
+        Features::apiCatalog(),
     ],
 ];

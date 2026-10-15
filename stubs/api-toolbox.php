@@ -76,6 +76,22 @@ return [
             // The key signature.sign uses when none is named.
             'sign' => ['key' => null],
         ]),
+        Features::apiCatalog([
+            // Each API: its URL as href, then any of service-desc (a machine-readable description,
+            // such as OpenAPI), service-doc (human documentation), service-meta and status.
+            'apis' => [
+                // [
+                //     'href' => '/api/v1',
+                //     'service-desc' => ['href' => '/openapi.json', 'type' => 'application/vnd.oai.openapi+json'],
+                //     'service-doc' => ['href' => 'https://docs.example.com', 'type' => 'text/html'],
+                // ],
+            ],
+            // Other API catalogs this one links to.
+            'catalogs' => [],
+            'max_age' => 3600,
+            // RFC 9727, section 8 recommends rate limiting the catalog, such as ['throttle:60,1'].
+            'middleware' => [],
+        ]),
         // Experimental: built on an IETF draft that can still change.
         // Features::rateLimitHeaders(),
     ],

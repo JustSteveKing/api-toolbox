@@ -10,6 +10,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Testing\TestResponse;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\Testing\Assertions\ApiCatalogAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\CacheControlAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
@@ -72,8 +73,12 @@ final class TestingServiceProvider extends ServiceProvider
             self::negotiation($features);
         }
 
+        if ($features->enabled(Features::API_CATALOG)) {
+            self::apiCatalog();
+        }
+
         // Link headers come from more than one feature.
-        if ($features->enabled(Features::DEPRECATION) || $features->enabled(Features::PAGINATION)) {
+        if ($features->enabled(Features::DEPRECATION) || $features->enabled(Features::PAGINATION) || $features->enabled(Features::API_CATALOG)) {
             self::links();
         }
     }
@@ -178,6 +183,17 @@ final class TestingServiceProvider extends ServiceProvider
         });
 
         self::expectation('toHavePreferenceApplied', static fn (TestResponse $response, string $preference, ?string $value = null) => PreferenceAssertions::assertPreferenceApplied($response, $preference, $value));
+    }
+
+    private static function apiCatalog(): void
+    {
+        TestResponse::macro('assertApiCatalog', function (?string $api = null): TestResponse {
+            ApiCatalogAssertions::assertApiCatalog($this, $api);
+
+            return $this;
+        });
+
+        self::expectation('toBeApiCatalog', static fn (TestResponse $response, ?string $api = null) => ApiCatalogAssertions::assertApiCatalog($response, $api));
     }
 
     private static function digests(): void

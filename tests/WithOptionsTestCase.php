@@ -31,6 +31,15 @@ abstract class WithOptionsTestCase extends TestCase
                 'propagate_trace' => false,
             ]),
             Features::asyncOperations(['path' => 'v1/jobs', 'middleware' => [], 'retry_after' => 30]),
+            Features::apiCatalog([
+                'apis' => [[
+                    'href' => '/v1',
+                    'service-desc' => ['href' => '/v1/openapi.json', 'type' => 'application/vnd.oai.openapi+json'],
+                ]],
+                'catalogs' => ['https://partners.example.com/.well-known/api-catalog'],
+                'max_age' => 0,
+                'middleware' => ['throttle:2,1'],
+            ]),
         ];
     }
 }

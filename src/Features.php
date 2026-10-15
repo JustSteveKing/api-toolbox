@@ -46,6 +46,8 @@ final class Features
 
     public const string MESSAGE_SIGNATURES = 'message-signatures';
 
+    public const string API_CATALOG = 'api-catalog';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -209,6 +211,20 @@ final class Features
     }
 
     /**
+     * /.well-known/api-catalog, listing the application's APIs and where their descriptions and
+     * documentation live, so clients and agents can find them.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9727
+     * @see https://www.rfc-editor.org/rfc/rfc8631
+     *
+     * @param  array{apis?: list<array<string, mixed>>, catalogs?: list<string>, max_age?: int, middleware?: list<string>}  $options
+     */
+    public static function apiCatalog(array $options = []): string
+    {
+        return self::withOptions(self::API_CATALOG, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -228,6 +244,7 @@ final class Features
             self::MERGE_PATCH,
             self::DIGESTS,
             self::MESSAGE_SIGNATURES,
+            self::API_CATALOG,
         ];
     }
 

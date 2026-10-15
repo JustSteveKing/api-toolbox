@@ -39,6 +39,7 @@ $features = [
     'JustSteveKing\Toolbox\MergePatch',
     'JustSteveKing\Toolbox\Digest',
     'JustSteveKing\Toolbox\MessageSignatures',
+    'JustSteveKing\Toolbox\ApiCatalog',
 ];
 
 foreach ($features as $feature) {

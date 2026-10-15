@@ -21,6 +21,7 @@ Requires PHP 8.3 and Laravel 13.30 or later.
 | [Merge Patch](#merge-patch) | [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396) | Stable |
 | [Digest Fields](#digest-fields) | [RFC 9530](https://www.rfc-editor.org/rfc/rfc9530); problem types from [draft-ietf-httpapi-digest-fields-problem-types-06](https://datatracker.ietf.org/doc/draft-ietf-httpapi-digest-fields-problem-types/) | Stable |
 | [Message Signatures](#message-signatures) | [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421) | Stable |
+| [API Catalog](#api-catalog) | [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727), [RFC 9264](https://www.rfc-editor.org/rfc/rfc9264), [RFC 8631](https://www.rfc-editor.org/rfc/rfc8631) | Stable |
 | [Negotiation](#negotiation) | [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12), [W3C Trace Context](https://www.w3.org/TR/trace-context/); request IDs have no standard | Stable |
 | [Testing](#testing) | Assertions for each of the above | Stable |
 
@@ -57,6 +58,7 @@ use JustSteveKing\Toolbox\Features;
     Features::mergePatch(),
     Features::digests(),
     Features::messageSignatures(['keys' => [/* ... */]]),
+    Features::apiCatalog(['apis' => [/* ... */]]),
     // Features::rateLimitHeaders(),
 ],
 ```
@@ -1054,6 +1056,81 @@ Queueing and retrying deliveries is Laravel's job: put `$tries` and `$backoff` o
 `notSigned()` has no equivalent; leave out `withSignature()`. Receivers verifying the old
 `Signature` header need updating to RFC 9421; `signature.verify` is that receiver for Laravel.
 
+## API Catalog
+
+[RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) gives a publisher one place to list its APIs:
+`/.well-known/api-catalog`. Clients, crawlers and agents that know nothing else about you can
+find each API there, and where its OpenAPI description and documentation live.
+
+```php
+Features::apiCatalog([
+    'apis' => [
+        [
+            'href' => '/api/v1',
+            'service-desc' => ['href' => '/openapi.json', 'type' => 'application/vnd.oai.openapi+json'],
+            'service-doc' => ['href' => 'https://docs.example.com', 'type' => 'text/html'],
+            'status' => '/api/v1/health',
+        ],
+    ],
+]),
+```
+
+`href` is the API itself. The other keys are the [RFC 8631](https://www.rfc-editor.org/rfc/rfc8631)
+relations: `service-desc` (a machine-readable description), `service-doc` (documentation for
+people), `service-meta` (metadata such as policies) and `status`. Each is a URL, a target with
+`href` and any of `type`, `title`, `hreflang` and `media`, or a list of either. Relative URLs are
+resolved against the application URL, because RFC 9264 §4.2.2 says a linkset SHOULD NOT use
+relative references.
+
+GET returns:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"
+Link: <https://example.com/.well-known/api-catalog>; rel="api-catalog"
+Cache-Control: max-age=3600, public
+
+{"linkset":[
+  {"anchor":"https://example.com/.well-known/api-catalog",
+   "item":[{"href":"https://example.com/api/v1"}]},
+  {"anchor":"https://example.com/api/v1",
+   "service-desc":[{"href":"https://example.com/openapi.json","type":"application/vnd.oai.openapi+json"}],
+   "service-doc":[{"href":"https://docs.example.com","type":"text/html"}],
+   "status":[{"href":"https://example.com/api/v1/health"}]}
+]}
+```
+
+RFC 9727's appendix shows two shapes, and the spec does not say which to use. A.1 anchors each
+API's RFC 8631 links at the API. A.2 lists APIs from the catalog with `item`. This package
+uses both: the catalog lists every API with `item`, which meets §4.1's MUST that a catalog link
+to its APIs, and each API that has metadata gets its own entry, which is the metadata §4.1
+recommends. A client reading either shape finds what it is looking for.
+
+HEAD is answered with the same `Link` field, as §2 requires.
+
+Other catalogs are linked with `api-catalog` (§4.3), for example one per business unit:
+
+```php
+Features::apiCatalog(['catalogs' => ['https://payments.example.com/.well-known/api-catalog']]),
+```
+
+To build the catalog from somewhere else, such as a database or an API gateway, bind your own
+`JustSteveKing\Toolbox\ApiCatalog\Contracts\CatalogSource`.
+
+To point to the catalog from your API's own responses, as §3 shows for a home page, add the
+`api-catalog.link` middleware:
+
+```php
+Route::get('api', ApiRoot::class)->middleware('api-catalog.link');
+```
+
+### Security
+
+RFC 9727 §8 says the catalog SHOULD be served over TLS and recommends rate limiting it. TLS is
+your server's job. For rate limiting, the route takes the `middleware` option:
+`'middleware' => ['throttle:60,1']`. The catalog is public, so list only the APIs you mean
+anyone to find; §8 warns against exposing internal ones.
+
 ## Negotiation
 
 [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12),
@@ -1188,7 +1265,8 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | Digest Fields | `assertContentDigest()` | `toHaveContentDigest()` | `Content-Digest` is a Dictionary of Byte Sequences, and each sha-256 or sha-512 member matches the content (RFC 9530 §2) |
 | | `assertReprDigest()` | `toHaveReprDigest()` | Likewise for `Repr-Digest` (§3) |
 | Merge Patch | `assertAcceptsPatch(?mediaType)` | | `Accept-Patch` lists the media type (RFC 5789 §3.1), `application/merge-patch+json` by default |
-| Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
+| API Catalog | `assertApiCatalog(?api)` | `toBeApiCatalog(?api)` | `application/linkset+json`; `linkset` is the sole member (RFC 9264 §4.2.1); every target is in an array and has an `href`; the API is listed with `item` if given |
+| Deprecation, Pagination, API Catalog | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 
 Dates can be a `DateTimeInterface` or a string. A string without an offset is read as UTC.
@@ -1229,6 +1307,10 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `verify.tag` | `null` | A tag every accepted signature carries |
 | | `verify.require_nonce` | `false` | Require a `nonce` |
 | | `sign.key` | `null` | The key `signature.sign` uses when none is named |
+| `apiCatalog` | `apis` | `[]` | The APIs to list: `href`, then any of `service-desc`, `service-doc`, `service-meta` and `status` |
+| | `catalogs` | `[]` | Other API catalogs to link to |
+| | `max_age` | `3600` | `Cache-Control` max-age in seconds; `0` for none |
+| | `middleware` | `[]` | Middleware the catalog route runs behind |
 | `rateLimitHeaders` | `legacy_headers` | `true` | Keep Laravel's `X-RateLimit-*` headers |
 | `negotiation` | `request_id_header` | `X-Request-Id` | Request ID header name; `false` turns request IDs off |
 | | `trust_request_id` | `true` | Keep a well-formed incoming request ID |
@@ -1249,6 +1331,7 @@ Every option, with its default. Options are passed inline to the feature's metho
 | `digest.respond` | Digest Fields | Adds the digests a client wants; `digest.respond:always` for `Repr-Digest` on every response |
 | `signature.verify` | Message Signatures | 401 without a valid signature meeting the verify policy |
 | `signature.sign` | Message Signatures | Signs the response; `signature.sign:key-id` names the key |
+| `api-catalog.link` | API Catalog | Adds `Link: <...>; rel="api-catalog"` to the response |
 | `produces` | Negotiation | 406; `produces:application/json` |
 | `consumes` | Negotiation | 415; `consumes:application/json,application/merge-patch+json` |
 
