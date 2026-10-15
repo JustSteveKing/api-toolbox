@@ -167,6 +167,35 @@ rejected, because it would silently replace that member.
 
 A problem class can inherit its `#[ProblemType]` from an abstract parent.
 
+### Generating a problem type
+
+```bash
+php artisan make:api-problem OutOfCredit --title="You do not have enough credit." --status=403
+php artisan make:api-problem AccountFrozen --apiguide=account-frozen
+```
+
+The class goes in `app/Problems`; a name like `Billing/CardDeclined` makes
+`App\Problems\Billing\CardDeclined`. Section 4 says a new problem type MUST document a type URI,
+a title and its status, so the command will not write a class without all three: it prompts for
+whatever you leave out, and fails under `--no-interaction`, where there is nobody to ask.
+
+| Option | Does |
+|---|---|
+| `--title` | The title. Section 3.1.3: it should not change between occurrences |
+| `--status` | The status, 4xx or 5xx |
+| `--type` | A slug or type URI. Defaults to the class name in kebab case, resolved against `type_base_uri` |
+| `--apiguide` | An apiguide.dev entry, such as `account-frozen`, for all three at once. Cannot be combined with the three above |
+| `--force` | Overwrite an existing class |
+
+```php
+#[ProblemType(ApiGuide::ACCOUNT_FROZEN, title: 'Account Frozen', status: 403)]
+final class AccountFrozen extends ProblemException {}
+```
+
+`php artisan stub:publish` includes `stubs/api-problem.stub`, and the command uses that copy once
+it exists, for teams that want their own docblocks or extension members. The command is only
+registered when Problem Details is enabled.
+
 ### What else is rendered
 
 | Exception | Status | type |

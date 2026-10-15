@@ -87,7 +87,7 @@ it('produces exactly the committed class from the committed catalogue', function
 
         $entries[$slug] = [
             'title' => $titles[$uri],
-            'status' => (int) preg_replace('/\D/', '', strtok($doc, "\n")),
+            'status' => ApiGuide::status($uri),
             'deprecated' => str_contains($doc, '@deprecated'),
         ];
     }

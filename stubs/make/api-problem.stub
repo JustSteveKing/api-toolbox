@@ -1,0 +1,11 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use JustSteveKing\Toolbox\ProblemDetails\Attributes\ProblemType;
+use JustSteveKing\Toolbox\ProblemDetails\ProblemException;
+{{ imports }}
+#[ProblemType({{ type }}, title: {{ title }}, status: {{ status }})]
+final class {{ class }} extends ProblemException {}

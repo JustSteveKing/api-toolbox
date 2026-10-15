@@ -6,7 +6,9 @@ namespace JustSteveKing\Toolbox\ProblemDetails;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Foundation\Events\PublishingStubs;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,7 @@ use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\ProblemDetails\Console\MakeApiProblemCommand;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
 use Throwable;
 
@@ -80,6 +83,17 @@ final class ProblemDetailsServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([MakeApiProblemCommand::class]);
+
+            // `php artisan stub:publish` copies this stub too, for teams that want their own.
+            $this->callAfterResolving('events', static function (Dispatcher $events): void {
+                $events->listen(PublishingStubs::class, static function (PublishingStubs $event): void {
+                    $event->add(__DIR__.'/../../stubs/make/'.MakeApiProblemCommand::STUB, MakeApiProblemCommand::STUB);
+                });
+            });
+        }
+
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
             if (! $handler instanceof Handler) {
                 return;

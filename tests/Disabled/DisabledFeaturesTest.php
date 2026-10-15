@@ -55,6 +55,10 @@ it('registers no problem details provider, bindings or render hooks', function (
         ->and(renderCallbacks())->toBe([]);
 });
 
+it('registers no make:api-problem command', function (): void {
+    expect(Illuminate\Support\Facades\Artisan::all())->not->toHaveKey('make:api-problem');
+});
+
 it('leaves Laravel to render exceptions', function (): void {
     Route::get('api/credit', fn () => throw new OutOfCredit);
 

@@ -169,6 +169,47 @@ final class ApiGuide
     ];
 
     /**
+     * Each type's status code, as the catalogue gives it.
+     */
+    private const array STATUS_CODES = [
+        self::ACCOUNT_FROZEN => 403,
+        self::BAD_GATEWAY => 502,
+        self::EXPIRED_AUTHENTICATION_TOKEN => 401,
+        self::FORBIDDEN => 403,
+        self::GATEWAY_TIMEOUT => 504,
+        self::GONE => 410,
+        self::IDEMPOTENCY_KEY_CONFLICT => 422,
+        self::INSUFFICIENT_FUNDS => 402,
+        self::INSUFFICIENT_SCOPE => 403,
+        self::INTERNAL_SERVER_ERROR => 500,
+        self::INVALID_PAGINATION_CURSOR => 400,
+        self::INVALID_QUERY_PARAMETER => 400,
+        self::LENGTH_REQUIRED => 411,
+        self::MALFORMED_REQUEST_BODY => 400,
+        self::METHOD_NOT_ALLOWED => 405,
+        self::NOT_ACCEPTABLE => 406,
+        self::NOT_IMPLEMENTED => 501,
+        self::PAYLOAD_TOO_LARGE => 413,
+        self::PRECONDITION_FAILED => 412,
+        self::PRECONDITION_REQUIRED => 428,
+        self::QUOTA_EXCEEDED => 429,
+        self::RANGE_NOT_SATISFIABLE => 416,
+        self::RATE_LIMIT_EXCEEDED => 429,
+        self::REQUEST_HEADER_FIELDS_TOO_LARGE => 431,
+        self::REQUEST_TIMEOUT => 408,
+        self::RESOURCE_CONFLICT => 409,
+        self::RESOURCE_NOT_FOUND => 404,
+        self::SERVICE_UNAVAILABLE => 503,
+        self::STALE_RESOURCE_VERSION => 409,
+        self::UNAUTHORIZED => 401,
+        self::UNPROCESSABLE_QUERY => 422,
+        self::UNSUPPORTED_API_VERSION => 400,
+        self::UNSUPPORTED_MEDIA_TYPE => 415,
+        self::URI_TOO_LONG => 414,
+        self::VALIDATION_FAILED => 422,
+    ];
+
+    /**
      * The catalogue entry for a bare status code, where one entry is the plain meaning of that
      * code. Codes with several candidates, 400 and 422 among them, have none: picking one would
      * claim more than the status says.
@@ -203,8 +244,26 @@ final class ApiGuide
         return self::TITLES[$type] ?? null;
     }
 
+    /**
+     * The status code the catalogue documents a type with.
+     */
+    public static function status(string $type): ?int
+    {
+        return self::STATUS_CODES[$type] ?? null;
+    }
+
     public static function forStatus(int $status): ?string
     {
         return self::STATUSES[$status] ?? null;
+    }
+
+    /**
+     * Every type URI in the catalogue.
+     *
+     * @return list<string>
+     */
+    public static function types(): array
+    {
+        return array_keys(self::TITLES);
     }
 }

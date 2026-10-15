@@ -52,3 +52,10 @@ it('maps a status only to a type documented for that status', function (int $sta
 it('maps nothing where the catalogue has several candidates', function (int $status): void {
     expect(ApiGuide::forStatus($status))->toBeNull();
 })->with([400, 402, 418, 422]);
+
+it('knows the status the catalogue documents each type with', function (): void {
+    expect(ApiGuide::status(ApiGuide::ACCOUNT_FROZEN))->toBe(403)
+        ->and(ApiGuide::status(ApiGuide::IDEMPOTENCY_KEY_CONFLICT))->toBe(422)
+        ->and(ApiGuide::status('https://example.com/not-in-the-catalogue'))->toBeNull()
+        ->and(ApiGuide::types())->toHaveCount(35)->toContain(ApiGuide::GONE);
+});

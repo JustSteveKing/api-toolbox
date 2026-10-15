@@ -143,6 +143,7 @@ final class ApiGuideGenerator
 
         $constants = [];
         $titles = [];
+        $codes = [];
 
         foreach ($entries as $slug => $entry) {
             if (preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $slug) !== 1) {
@@ -156,6 +157,7 @@ final class ApiGuideGenerator
 
             $constants[] = "{$doc}\n    public const string {$name} = self::BASE.'{$slug}';\n";
             $titles[] = "        self::{$name} => ".var_export($entry['title'], true).',';
+            $codes[] = "        self::{$name} => {$entry['status']},";
         }
 
         $statuses = [];
@@ -200,6 +202,13 @@ final class ApiGuideGenerator
                 ];
 
                 /**
+                 * Each type's status code, as the catalogue gives it.
+                 */
+                private const array STATUS_CODES = [
+            %CODES%
+                ];
+
+                /**
                  * The catalogue entry for a bare status code, where one entry is the plain meaning of that
                  * code. Codes with several candidates, 400 and 422 among them, have none: picking one would
                  * claim more than the status says.
@@ -213,17 +222,35 @@ final class ApiGuideGenerator
                     return self::TITLES[\$type] ?? null;
                 }
 
+                /**
+                 * The status code the catalogue documents a type with.
+                 */
+                public static function status(string \$type): ?int
+                {
+                    return self::STATUS_CODES[\$type] ?? null;
+                }
+
                 public static function forStatus(int \$status): ?string
                 {
                     return self::STATUSES[\$status] ?? null;
+                }
+
+                /**
+                 * Every type URI in the catalogue.
+                 *
+                 * @return list<string>
+                 */
+                public static function types(): array
+                {
+                    return array_keys(self::TITLES);
                 }
             }
 
             PHP;
 
         return str_replace(
-            ['%CONSTANTS%', '%TITLES%', '%STATUSES%'],
-            [implode("\n", $constants), implode("\n", $titles), implode("\n", $statuses)],
+            ['%CONSTANTS%', '%TITLES%', '%CODES%', '%STATUSES%'],
+            [implode("\n", $constants), implode("\n", $titles), implode("\n", $codes), implode("\n", $statuses)],
             $template,
         );
     }
