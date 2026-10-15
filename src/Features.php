@@ -34,6 +34,8 @@ final class Features
 
     public const string RATE_LIMIT_HEADERS = 'rate-limit-headers';
 
+    public const string NEGOTIATION = 'negotiation';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -118,6 +120,22 @@ final class Features
     }
 
     /**
+     * 406 and 415 for routes that declare what they produce and consume, W3C Trace Context on
+     * every request, and a request ID.
+     *
+     * The request ID is the one part of this package that no published standard defines.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9110#section-12
+     * @see https://www.w3.org/TR/trace-context/
+     *
+     * @param  array{request_id_header?: string|false, trust_request_id?: bool, trace_context?: bool, propagate_trace?: bool}  $options
+     */
+    public static function negotiation(array $options = []): string
+    {
+        return self::withOptions(self::NEGOTIATION, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -131,6 +149,7 @@ final class Features
             self::PAGINATION,
             self::IDEMPOTENCY,
             self::RATE_LIMIT_HEADERS,
+            self::NEGOTIATION,
         ];
     }
 

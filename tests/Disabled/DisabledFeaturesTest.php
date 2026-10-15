@@ -20,6 +20,9 @@ use JustSteveKing\Toolbox\Facades\ApiToolbox;
 use JustSteveKing\Toolbox\Features;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyStore;
+use JustSteveKing\Toolbox\Negotiation\Http\Middleware\AssignRequestId;
+use JustSteveKing\Toolbox\Negotiation\Http\Middleware\PropagateTraceContext;
+use JustSteveKing\Toolbox\Negotiation\NegotiationServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
@@ -77,8 +80,21 @@ it('registers no testing macros for disabled features', function (string $macro)
     'assertProblem', 'assertProblemType', 'assertDeprecated', 'assertNotDeprecated',
     'assertSunset', 'assertLinkHeader', 'assertNoLinkHeader',
     'assertETag', 'assertNotModified', 'assertPreconditionFailed', 'assertPreconditionRequired',
-    'assertIdempotentReplay', 'assertRateLimitHeaders',
+    'assertIdempotentReplay', 'assertRateLimitHeaders', 'assertTraceparent', 'assertRequestId',
 ]);
+
+it('registers no negotiation aliases or global middleware, and adds no request ID or trace', function (): void {
+    expect(app()->getProviders(NegotiationServiceProvider::class))->toBe([])
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKeys(['produces', 'consumes'])
+        ->and(app(Kernel::class)->hasMiddleware(AssignRequestId::class))->toBeFalse()
+        ->and(app(Kernel::class)->hasMiddleware(PropagateTraceContext::class))->toBeFalse();
+
+    Route::get('api/ping', fn () => []);
+
+    $this->getJson('api/ping', ['traceparent' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'])
+        ->assertHeaderMissing('X-Request-Id')
+        ->assertHeaderMissing('traceparent');
+});
 
 it('registers no idempotency alias, binding or priority', function (): void {
     expect(app()->getProviders(IdempotencyServiceProvider::class))->toBe([])

@@ -36,6 +36,16 @@ return [
             // The draft (section 2.5.2) says to publish this in your API documentation.
             'ttl' => 86400,
         ]),
+        Features::negotiation([
+            // No standard defines a request ID header; this is the common convention. false turns
+            // request IDs off.
+            'request_id_header' => 'X-Request-Id',
+            // Keep a well-formed request ID a proxy or client sent, rather than replace it.
+            'trust_request_id' => true,
+            // W3C Trace Context on every request, and onto outgoing HTTP client requests.
+            'trace_context' => true,
+            'propagate_trace' => true,
+        ]),
         // Experimental: built on an IETF draft that can still change.
         // Features::rateLimitHeaders(),
     ],

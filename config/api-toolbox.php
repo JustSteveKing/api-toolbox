@@ -19,5 +19,6 @@ return [
         Features::conditionalRequests(),
         Features::pagination(),
         Features::idempotency(),
+        Features::negotiation(),
     ],
 ];

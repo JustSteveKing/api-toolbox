@@ -171,6 +171,29 @@ describe('idempotency and rate limit assertions', function (): void {
     ])->throws(AssertionFailedError::class);
 });
 
+describe('negotiation assertions', function (): void {
+    it('accept a valid traceparent and request ID', function (): void {
+        $response = fakeResponse(headers: [
+            'traceparent' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+            'X-Request-Id' => 'abc',
+        ]);
+
+        $response->assertTraceparent()->assertTraceparent('4bf92f3577b34da6a3ce929d0e0e4736')->assertRequestId('abc');
+        expect($response)->toHaveTraceparent()->toHaveRequestId();
+    });
+
+    it('reject', function (Closure $assert): void {
+        $assert();
+    })->with([
+        'no traceparent' => fn () => fakeResponse()->assertTraceparent(),
+        'uppercase' => fn () => fakeResponse(headers: ['traceparent' => '00-4BF92F3577B34DA6A3CE929D0E0E4736-00f067aa0ba902b7-01'])->assertTraceparent(),
+        'zero trace-id' => fn () => fakeResponse(headers: ['traceparent' => '00-00000000000000000000000000000000-00f067aa0ba902b7-01'])->assertTraceparent(),
+        'other trace' => fn () => fakeResponse(headers: ['traceparent' => '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'])->assertTraceparent(str_repeat('1', 32)),
+        'no request ID' => fn () => fakeResponse()->assertRequestId(),
+        'other request ID' => fn () => fakeResponse(headers: ['X-Request-Id' => 'a'])->assertRequestId('b'),
+    ])->throws(AssertionFailedError::class);
+});
+
 describe('Pest expectations', function (): void {
     it('mirror the macros', function (): void {
         expect(fakeProblem(['type' => 'https://example.com/a', 'status' => 403]))

@@ -33,6 +33,7 @@ $features = [
     'JustSteveKing\Toolbox\Pagination',
     'JustSteveKing\Toolbox\Idempotency',
     'JustSteveKing\Toolbox\RateLimitHeaders',
+    'JustSteveKing\Toolbox\Negotiation',
 ];
 
 foreach ($features as $feature) {

@@ -2,11 +2,31 @@
 
 Standards-compliant APIs in Laravel, one RFC at a time.
 
-Every feature in this package implements a published HTTP standard, and each one can be
-switched on or off by itself. A feature you leave off registers nothing: no bindings, no
-middleware, no exception handling hooks.
+Each feature in this package implements a published HTTP standard, and each one is switched on
+or off by itself. A feature you leave off registers nothing: no bindings, no middleware aliases,
+no macros, no exception handling hooks.
 
 Requires PHP 8.3 and Laravel 13.30 or later.
+
+| Feature | Standard | Status |
+|---|---|---|
+| [Problem Details](#problem-details) | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | Stable |
+| [Deprecation and Sunset](#deprecation-and-sunset) | [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745), [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) | Stable |
+| [Conditional Requests](#conditional-requests) | [RFC 9110 §13](https://www.rfc-editor.org/rfc/rfc9110#section-13), [RFC 6585 §3](https://www.rfc-editor.org/rfc/rfc6585#section-3) | Stable |
+| [Pagination](#pagination) | [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288) | Stable |
+| [Idempotency](#idempotency) | [draft-ietf-httpapi-idempotency-key-header-07](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/) | Stable; the draft has expired |
+| [RateLimit headers](#ratelimit-headers-experimental) | [draft-ietf-httpapi-ratelimit-headers-11](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/) | Experimental |
+| [Negotiation](#negotiation) | [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12), [W3C Trace Context](https://www.w3.org/TR/trace-context/); request IDs have no standard | Stable |
+| [Testing](#testing) | Assertions for each of the above | Stable |
+
+One part of the package has no standard behind it: request IDs, in Negotiation. No
+specification defines a request ID header. They are included because a request ID is how a
+support ticket, a log line and a response get tied together, and the
+[Negotiation](#request-ids) section says exactly what they do.
+
+Every problem the package raises itself is typed from the
+[apiguide.dev error catalogue](https://apiguide.dev/errors), so each `type` resolves to a page
+explaining the error and how to recover.
 
 ## Install
 
@@ -15,19 +35,25 @@ composer require juststeveking/api-toolbox
 php artisan vendor:publish --tag=api-toolbox-config
 ```
 
-Features are listed in `config/api-toolbox.php`, and options are passed to them inline:
+Features are listed in `config/api-toolbox.php`. Options are passed to each one inline:
 
 ```php
 use JustSteveKing\Toolbox\Features;
 
 'features' => [
-    Features::problemDetails([
-        'type_base_uri' => 'https://docs.example.com/problems',
-    ]),
+    Features::problemDetails(['type_base_uri' => 'https://docs.example.com/problems']),
+    Features::deprecation(),
+    Features::conditionalRequests(),
+    Features::pagination(),
+    Features::idempotency(['ttl' => 86400]),
+    Features::negotiation(),
+    // Features::rateLimitHeaders(),
 ],
 ```
 
-If you never publish the config, every stable feature is on with its defaults.
+If you never publish the config, every stable feature is on with its defaults. A feature name
+the package does not recognise throws when the application boots, so a typo cannot silently
+switch something off. Every option is listed in the [configuration reference](#configuration-reference).
 
 To check a feature at runtime:
 
@@ -35,17 +61,23 @@ To check a feature at runtime:
 use JustSteveKing\Toolbox\Facades\ApiToolbox;
 use JustSteveKing\Toolbox\Features;
 
-ApiToolbox::enabled(Features::problemDetails());
+ApiToolbox::enabled(Features::idempotency());
 ```
 
 Or inject `JustSteveKing\Toolbox\Contracts\EnabledFeatures`.
 
+The config follows Laravel Fortify's `Features` design, and works with `php artisan config:cache`
+for the same reason Fortify's does.
+
 ### Stability
 
-A feature built on an IETF draft is marked experimental in its section below and in the
-docblock of its `Features::` method. Experimental features can change in a breaking way in a
-minor release, because the draft underneath them can. Pin a minor version if you rely on one.
+A feature built on an IETF draft that is still moving is marked experimental, here and in the
+docblock of its `Features::` method. **Experimental features can change in a breaking way in a
+minor release**, because the draft underneath them can. Pin a minor version if you rely on one.
 Every other feature follows semantic versioning.
+
+Idempotency is built on a draft too, but one that expired without changing shape, and the
+header is in wide use. It is treated as stable.
 
 ## Problem Details
 
@@ -463,7 +495,8 @@ keys last. Put your `ttl` in your API documentation.
   the server can be retried, which is the point of the key; nor is a 429, because the request
   never ran.
 - **A replay is the stored response** with its original status, headers and body, minus `Date`
-  and cookies. No header marks it as a replay: the draft defines none.
+  and cookies. With Negotiation on, it gets its own request ID and `traceparent`, because a retry
+  is a new request. No header marks it as a replay: the draft defines none.
 - **The cache store has to support atomic locks**, which is how a concurrent retry is told apart
   from a completed one. Redis, Memcached, database, file, DynamoDB and array do. APC, session and
   storage stores do not, and nor does the null store in practice, since it keeps nothing. The
@@ -532,10 +565,106 @@ The draft does not say whether the policy item in `RateLimit` (section 4) must b
 section 3 requires for `RateLimit-Policy`. Every example uses one, and the same name has to
 identify the same policy in both, so this package always sends a String.
 
+## Negotiation
+
+[RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12),
+[W3C Trace Context Level 1](https://www.w3.org/TR/trace-context/)
+
+Three things that sit between a request and its handler: refusing what a route cannot produce or
+consume, joining a request to its distributed trace, and giving it an ID.
+
+```php
+Features::negotiation([
+    'request_id_header' => 'X-Request-Id', // false turns request IDs off
+    'trust_request_id' => true,            // keep a well-formed incoming ID
+    'trace_context' => true,
+    'propagate_trace' => true,             // onto outgoing HTTP client requests
+]),
+```
+
+### 406 and 415
+
+An API that only speaks JSON answers an `Accept: application/xml` client with JSON anyway, and
+accepts a form post it then fails to read. Declaring what a route produces and consumes turns
+both into a clear error.
+
+```php
+Route::post('leads', CreateLead::class)
+    ->middleware(['produces:application/json', 'consumes:application/json']);
+
+Route::patch('leads/{lead}', UpdateLead::class)
+    ->middleware('consumes:application/merge-patch+json');
+```
+
+`produces` answers 406, typed `https://apiguide.dev/errors/not-acceptable`, when the `Accept`
+header rules out every type listed. `consumes` answers 415, typed
+`https://apiguide.dev/errors/unsupported-media-type`, when the request has content in any other
+type.
+
+- `Accept` is evaluated as section 12.5.1 says: quality values, wildcards, and the most specific
+  matching range deciding a type's quality. `q=0` means not acceptable, even under `*/*`. A
+  missing `Accept` accepts anything.
+- Section 12.5.1 lets a server ignore an unsatisfiable `Accept` instead. Adding `produces` to a
+  route is choosing strict negotiation.
+- Responses from a `produces` route carry `Vary: Accept`, since whether they are a 406 depends on
+  it.
+- The 406 lists what the route can produce in its `detail`, which section 15.5.7 says it SHOULD.
+- Error responses are not held to `produces`: RFC 9457 section 3 notes a problem can be sent as
+  `application/problem+json` even when the client did not list it.
+- The 415 carries an `Accept` header naming the supported types, as section 15.5.16 suggests, and
+  a refused PATCH also carries `Accept-Patch`, which RFC 5789 section 2.2 says it SHOULD.
+- A request with no content is never refused. One with content and no `Content-Type` is: section
+  8.3 lets a server guess, and a guess is not a type the route said it consumes.
+- Types match on type and subtype, case-insensitively. `consumes:application/json` accepts
+  `application/json; charset=utf-8`, and does not accept `application/merge-patch+json`; list it.
+
+### Trace context
+
+Each request joins the W3C trace its caller started, or starts one. The trace ID and the span ID
+for this request are put in Laravel's log context, so every log line written while handling it
+carries them, and so do queued jobs it dispatches. Laravel HTTP client requests carry the trace
+on in `traceparent`, with `tracestate` forwarded unchanged. That outgoing propagation is the core
+of the specification (section 4.3).
+
+```http
+GET /orders HTTP/1.1
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+
+HTTP/1.1 200 OK
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-b7ad6b7169203331-01
+```
+
+- A valid `traceparent` is continued: same trace ID, a new parent ID for this request, flags
+  kept.
+- No `traceparent`, or one the specification says to reject (version `ff`, uppercase or
+  all-zero IDs, extra fields on version 00), starts a new trace and drops any `tracestate`. A
+  higher version is read as far as version 00 goes, as section 3.2.4 describes.
+- Flags version 00 does not define are cleared before anything is sent on (section 4.3).
+- A response only gets a `traceparent` when the request brought a valid one. Level 1 defines it as
+  a request header; section 6.3 notes vendors send it on responses too, and asks that they only
+  do so to systems that took part in the trace.
+- An outgoing request that already has a `traceparent`, from OpenTelemetry instrumentation for
+  example, is left alone.
+
+### Request IDs
+
+**No standard defines this.** It is included deliberately, because a request ID is how a support
+ticket, a log line and a response are tied together, and it is the one part of the package not
+built on a published specification.
+
+Every request gets an ID, on the response and in the log context as `request_id`. `X-Request-Id`
+is the default because it is what most proxies, load balancers and hosting platforms already use;
+set `request_id_header` to use another name.
+
+- An incoming ID of 1 to 200 visible ASCII characters is kept, so one ID can follow a request
+  through a proxy. Set `trust_request_id` to `false` to always assign your own.
+- Otherwise the ID is a UUIDv7, so IDs sort roughly by time in logs.
+- Error responses carry it too.
+
 ## Testing
 
 Assertions for every enabled feature, on Laravel's `TestResponse` and as Pest expectations.
-They check the exact syntax each RFC specifies, not only that a header is present. They are
+They check the exact syntax each standard specifies, not only that a header is present. They are
 registered only while the application is running its tests (`APP_ENV=testing`), and only for
 features that are enabled. The Pest expectations need Pest; the response macros work with
 PHPUnit alone.
@@ -559,12 +688,52 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | | `assertNotModified()` | `toBeNotModified()` | 304 with no content (RFC 9110 §15.4.5) |
 | | `assertPreconditionFailed()` | `toBePreconditionFailed()` | 412 |
 | | `assertPreconditionRequired()` | `toBePreconditionRequired()` | 428 that explains itself and carries `no-store` (RFC 6585 §3) |
-| Idempotency | `assertIdempotentReplay(original)` | `toBeIdempotentReplayOf(original)` | The same status, content and headers as the original response, other than `Date` and cookies (draft §2.6) |
+| Idempotency | `assertIdempotentReplay(original)` | `toBeIdempotentReplayOf(original)` | The same status, content and headers as the original response, other than those that identify the message: `Date`, cookies, `traceparent` and the request ID header (draft §2.6) |
 | RateLimit headers | `assertRateLimitHeaders(?policy, ?remaining)` | `toHaveRateLimitHeaders(?policy, ?remaining)` | Both fields parse as RFC 9651 Lists with the draft's parameters and types (draft §3, §4), and describe the policy if given |
+| Negotiation | `assertTraceparent(?traceId)` | `toHaveTraceparent(?traceId)` | A valid version 00 `traceparent` (Trace Context §3.2), in the given trace if one is passed |
+| | `assertRequestId(?id)` | `toHaveRequestId(?id)` | The configured request ID header is present, with the given value if one is passed |
 | Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 
 Dates can be a `DateTimeInterface` or a string. A string without an offset is read as UTC.
+
+## Configuration reference
+
+Every option, with its default. Options are passed inline to the feature's method in
+`config/api-toolbox.php`.
+
+| Feature | Option | Default | Meaning |
+|---|---|---|---|
+| `problemDetails` | `type_base_uri` | `/problems` | Base URI for type slugs in `#[ProblemType]` |
+| | `paths` | `['api/*']` | Paths that always get problem details, whatever `Accept` says |
+| | `apiguide` | `true` | Type plain HTTP errors and validation with the apiguide.dev catalogue |
+| `deprecation` | `global` | `true` | Run on every request; otherwise use the `deprecation` middleware |
+| `conditionalRequests` | | | No options. Opt in per route with `conditional` |
+| `pagination` | | | No options. Use `CursorPage` |
+| `idempotency` | `ttl` | `86400` | Seconds a result is kept, and so how long a key is valid |
+| | `store` | default store | Cache store; must support atomic locks |
+| | `lock` | `60` | Longest a request is treated as in flight |
+| | `retry_after` | `1` | `Retry-After` seconds on a 409 |
+| | `documentation` | `null` | URL linked from a 400 as `rel="describedby"` |
+| `rateLimitHeaders` | `legacy_headers` | `true` | Keep Laravel's `X-RateLimit-*` headers |
+| `negotiation` | `request_id_header` | `X-Request-Id` | Request ID header name; `false` turns request IDs off |
+| | `trust_request_id` | `true` | Keep a well-formed incoming request ID |
+| | `trace_context` | `true` | Join requests to their W3C trace |
+| | `propagate_trace` | `true` | Send the trace on in HTTP client requests |
+
+| Middleware | Feature | Does |
+|---|---|---|
+| `deprecation` | Deprecation | `Deprecation`, `Sunset` and their links, when `global` is off |
+| `conditional` | Conditional Requests | `preconditions` then `validators` |
+| `preconditions` | Conditional Requests | Evaluates `If-*` headers: 412 or 304 |
+| `validators` | Conditional Requests | Adds `ETag` and `Last-Modified`; `validators:weak` for a weak hash |
+| `preconditions.required` | Conditional Requests | 428 without a precondition; `preconditions.required:PUT,POST` |
+| `idempotent` | Idempotency | Honours `Idempotency-Key`; `idempotent:required` for 400 without one |
+| `produces` | Negotiation | 406; `produces:application/json` |
+| `consumes` | Negotiation | 415; `consumes:application/json,application/merge-patch+json` |
+
+Request IDs and trace context run as global middleware. RateLimit headers take over Laravel's
+`throttle` middleware. Neither needs adding to routes.
 
 ## License
 

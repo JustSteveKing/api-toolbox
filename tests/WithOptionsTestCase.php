@@ -23,6 +23,11 @@ abstract class WithOptionsTestCase extends TestCase
                 'documentation' => 'https://docs.example.com/idempotency',
             ]),
             Features::rateLimitHeaders(['legacy_headers' => false]),
+            Features::negotiation([
+                'request_id_header' => 'Correlation-Id',
+                'trust_request_id' => false,
+                'propagate_trace' => false,
+            ]),
         ];
     }
 }

@@ -14,6 +14,7 @@ use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\IdempotencyAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\LinkAssertions;
+use JustSteveKing\Toolbox\Testing\Assertions\NegotiationAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ProblemDetailsAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\RateLimitAssertions;
 use Pest\Expectation;
@@ -45,11 +46,15 @@ final class TestingServiceProvider extends ServiceProvider
         }
 
         if ($features->enabled(Features::IDEMPOTENCY)) {
-            $this->idempotency();
+            $this->idempotency($features);
         }
 
         if ($features->enabled(Features::RATE_LIMIT_HEADERS)) {
             $this->rateLimitHeaders();
+        }
+
+        if ($features->enabled(Features::NEGOTIATION)) {
+            $this->negotiation($features);
         }
 
         // Link headers come from more than one feature.
@@ -132,15 +137,21 @@ final class TestingServiceProvider extends ServiceProvider
         $this->expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
     }
 
-    private function idempotency(): void
+    private function idempotency(EnabledFeatures $features): void
     {
-        TestResponse::macro('assertIdempotentReplay', function (TestResponse $original): TestResponse {
-            IdempotencyAssertions::assertIdempotentReplay($this, $original);
+        // A replay is a new message, so it carries its own request ID.
+        $requestId = $features->enabled(Features::NEGOTIATION)
+            ? ($features->options(Features::NEGOTIATION)['request_id_header'] ?? 'X-Request-Id')
+            : null;
+        $perMessage = is_string($requestId) ? [$requestId] : [];
+
+        TestResponse::macro('assertIdempotentReplay', function (TestResponse $original) use ($perMessage): TestResponse {
+            IdempotencyAssertions::assertIdempotentReplay($this, $original, $perMessage);
 
             return $this;
         });
 
-        $this->expectation('toBeIdempotentReplayOf', static fn (TestResponse $response, TestResponse $original) => IdempotencyAssertions::assertIdempotentReplay($response, $original));
+        $this->expectation('toBeIdempotentReplayOf', static fn (TestResponse $response, TestResponse $original) => IdempotencyAssertions::assertIdempotentReplay($response, $original, $perMessage));
     }
 
     private function rateLimitHeaders(): void
@@ -152,6 +163,27 @@ final class TestingServiceProvider extends ServiceProvider
         });
 
         $this->expectation('toHaveRateLimitHeaders', static fn (TestResponse $response, ?string $policy = null, ?int $remaining = null) => RateLimitAssertions::assertRateLimitHeaders($response, $policy, $remaining));
+    }
+
+    private function negotiation(EnabledFeatures $features): void
+    {
+        $header = $features->options(Features::NEGOTIATION)['request_id_header'] ?? 'X-Request-Id';
+        $header = is_string($header) ? $header : 'X-Request-Id';
+
+        TestResponse::macro('assertTraceparent', function (?string $traceId = null): TestResponse {
+            NegotiationAssertions::assertTraceparent($this, $traceId);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertRequestId', function (?string $id = null) use ($header): TestResponse {
+            NegotiationAssertions::assertRequestId($this, $header, $id);
+
+            return $this;
+        });
+
+        $this->expectation('toHaveTraceparent', static fn (TestResponse $response, ?string $traceId = null) => NegotiationAssertions::assertTraceparent($response, $traceId));
+        $this->expectation('toHaveRequestId', static fn (TestResponse $response, ?string $id = null) => NegotiationAssertions::assertRequestId($response, $header, $id));
     }
 
     private function links(): void

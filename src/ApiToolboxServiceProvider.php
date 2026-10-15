@@ -10,6 +10,7 @@ use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
+use JustSteveKing\Toolbox\Negotiation\NegotiationServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\RateLimitHeaders\RateLimitHeadersServiceProvider;
@@ -34,6 +35,7 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::PAGINATION => PaginationServiceProvider::class,
         Features::IDEMPOTENCY => IdempotencyServiceProvider::class,
         Features::RATE_LIMIT_HEADERS => RateLimitHeadersServiceProvider::class,
+        Features::NEGOTIATION => NegotiationServiceProvider::class,
     ];
 
     public function register(): void
