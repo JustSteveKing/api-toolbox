@@ -38,6 +38,7 @@ $features = [
     'JustSteveKing\Toolbox\AsyncOperations',
     'JustSteveKing\Toolbox\MergePatch',
     'JustSteveKing\Toolbox\Digest',
+    'JustSteveKing\Toolbox\MessageSignatures',
 ];
 
 foreach ($features as $feature) {

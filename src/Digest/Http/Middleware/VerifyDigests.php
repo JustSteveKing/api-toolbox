@@ -6,9 +6,12 @@ namespace JustSteveKing\Toolbox\Digest\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use JustSteveKing\Toolbox\Digest\DigestAlgorithm;
 use JustSteveKing\Toolbox\Digest\DigestField;
 use JustSteveKing\Toolbox\Digest\Exceptions\DigestProblem;
+use JustSteveKing\Toolbox\Support\DigestAlgorithm;
+use JustSteveKing\Toolbox\Support\StructuredFields\ByteSequence;
+use JustSteveKing\Toolbox\Support\StructuredFields\Item;
+use JustSteveKing\Toolbox\Support\StructuredFields\Serializer;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use UnexpectedValueException;
@@ -71,7 +74,7 @@ final readonly class VerifyDigests
         $verified = 0;
 
         foreach ($members as $key => $value) {
-            $algorithm = DigestAlgorithm::tryFrom($key);
+            $algorithm = DigestAlgorithm::tryFrom((string) $key);
 
             if ($algorithm === null) {
                 $unsupported[] = ['algorithm' => $key, 'header' => $field];
@@ -79,7 +82,7 @@ final readonly class VerifyDigests
                 continue;
             }
 
-            $bytes = DigestField::bytes($value);
+            $bytes = $value instanceof Item && $value->value instanceof ByteSequence ? $value->value->bytes : null;
 
             if ($bytes === null || strlen($bytes) !== $algorithm->length()) {
                 $invalid[] = [
@@ -94,7 +97,7 @@ final readonly class VerifyDigests
             }
 
             if (! hash_equals($algorithm->digest($content), $bytes)) {
-                $mismatched[] = ['algorithm' => $key, 'provided_digest' => $value, 'header' => $field];
+                $mismatched[] = ['algorithm' => $key, 'provided_digest' => Serializer::member($value), 'header' => $field];
 
                 continue;
             }

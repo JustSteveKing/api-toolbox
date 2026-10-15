@@ -60,6 +60,22 @@ return [
         ]),
         Features::mergePatch(),
         Features::digests(),
+        Features::messageSignatures([
+            // Keys by keyid. The algorithm belongs to the key; the message never chooses it.
+            'keys' => [
+                // 'webhooks' => ['algorithm' => 'hmac-sha256', 'secret' => env('WEBHOOK_SECRET')],
+                // 'partner' => ['algorithm' => 'ed25519', 'public_key' => storage_path('keys/partner.pem')],
+            ],
+            // What signature.verify requires, beyond RFC 9421 itself.
+            'verify' => [
+                'required' => ['@method', '@authority', '@path'],
+                'max_age' => 300,
+                'leeway' => 30,
+                'cover_content' => true,
+            ],
+            // The key signature.sign uses when none is named.
+            'sign' => ['key' => null],
+        ]),
         // Experimental: built on an IETF draft that can still change.
         // Features::rateLimitHeaders(),
     ],

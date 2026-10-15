@@ -8,6 +8,9 @@
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
         </testsuite>
+        <testsuite name="Conformance">
+            <directory>tests/Conformance</directory>
+        </testsuite>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
@@ -20,6 +23,7 @@
             <directory>tests/Override</directory>
             <directory>tests/Options</directory>
             <directory>tests/Production</directory>
+            <directory>tests/Signatures</directory>
         </testsuite>
     </testsuites>
     <php>

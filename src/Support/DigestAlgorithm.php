@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace JustSteveKing\Toolbox\Digest;
+namespace JustSteveKing\Toolbox\Support;
 
 /**
  * The hashing algorithms RFC 9530 section 7.2 registers as Active, the only ones it recommends.

@@ -20,6 +20,7 @@ Requires PHP 8.3 and Laravel 13.30 or later.
 | [Async operations](#async-operations) | [RFC 9110 §15.3.3](https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3), [RFC 7240 §4.1](https://www.rfc-editor.org/rfc/rfc7240#section-4.1); the status monitor is this package's own | Stable |
 | [Merge Patch](#merge-patch) | [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396) | Stable |
 | [Digest Fields](#digest-fields) | [RFC 9530](https://www.rfc-editor.org/rfc/rfc9530); problem types from [draft-ietf-httpapi-digest-fields-problem-types-06](https://datatracker.ietf.org/doc/draft-ietf-httpapi-digest-fields-problem-types/) | Stable |
+| [Message Signatures](#message-signatures) | [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421) | Stable |
 | [Negotiation](#negotiation) | [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12), [W3C Trace Context](https://www.w3.org/TR/trace-context/); request IDs have no standard | Stable |
 | [Testing](#testing) | Assertions for each of the above | Stable |
 
@@ -55,6 +56,7 @@ use JustSteveKing\Toolbox\Features;
     Features::asyncOperations(),
     Features::mergePatch(),
     Features::digests(),
+    Features::messageSignatures(['keys' => [/* ... */]]),
     // Features::rateLimitHeaders(),
 ],
 ```
@@ -905,6 +907,153 @@ HEAD responses get no digest. RFC 9530 allows `Repr-Digest` on one, but Laravel'
 already removed a HEAD response's content by the time route middleware sees it, so the digest
 would be of nothing. 204 and 304 responses, and streamed ones, get none either.
 
+## Message Signatures
+
+[RFC 9421](https://www.rfc-editor.org/rfc/rfc9421)
+
+Every webhook provider signs its requests its own way: an HMAC in a header with a name of its
+choosing, over bytes of its choosing, sometimes with a timestamp. Every receiver writes code for
+each one. HTTP Message Signatures is the IETF's single answer: one way to say which parts of a
+message are signed, by which key, when, and with what.
+
+```php
+Features::messageSignatures([
+    'keys' => [
+        'webhooks' => ['algorithm' => 'hmac-sha256', 'secret' => env('WEBHOOK_SECRET')],
+        'partner' => ['algorithm' => 'ed25519', 'public_key' => storage_path('keys/partner.pem')],
+        'server' => ['algorithm' => 'ecdsa-p256-sha256', 'private_key' => storage_path('keys/server.pem')],
+    ],
+    'verify' => [
+        'required' => ['@method', '@authority', '@path'], // components every signature must cover
+        'max_age' => 300,                                  // seconds since created
+        'leeway' => 30,                                    // seconds of clock skew allowed
+        'cover_content' => true,                           // require and check content-digest on a body
+        'tag' => null,                                     // a tag every signature must carry
+        'require_nonce' => false,
+    ],
+    'sign' => ['key' => 'server'],                         // the key signature.sign uses by default
+]),
+```
+
+### Signing webhooks
+
+```php
+Http::withSignature('webhooks')->post($endpoint, $payload);
+```
+
+```http
+POST /orders HTTP/1.1
+Content-Type: application/json
+Content-Digest: sha-256=:...:
+Signature-Input: sig1=("@method" "@target-uri" "content-type" "content-digest");created=1760000000;keyid="webhooks"
+Signature: sig1=:...:
+```
+
+By default the signature covers the method, the full target URI, `Content-Type`, and a
+`Content-Digest` of the body, which is added for you. Choose other components, a label, or `expires`,
+`nonce` and `tag` parameters with the remaining arguments:
+`withSignature('partner', ['@method', '@authority'], 'partner-sig', ['tag' => 'orders'])`.
+
+### Verifying requests
+
+```php
+Route::post('webhooks/orders', HandleOrderWebhook::class)->middleware('signature.verify');
+
+VerifiedSignature::of($request)->keyId; // who signed it
+```
+
+A request passes when one of its signatures, from a known key, meets every rule below. The order
+follows [apiguide.dev's advice](https://apiguide.dev/headers/signature): verify the signature, then
+the digest, then the age.
+
+1. **The key is known.** An unknown `keyid` never verifies (section 3.2, step 5).
+2. **The algorithm is the key's.** The algorithm is configured with the key, and an `alg` parameter
+   that disagrees fails. Section 7.3.6 describes the downgrade this prevents, where an attacker asks
+   for HMAC and a naive verifier uses a public key as the secret.
+3. **It covers what you require**, and `content-digest` too when the request has a body.
+4. **The signature matches.**
+5. **The body matches `Content-Digest`.** A signature over `content-digest` only proves the header
+   was not changed; without recomputing the digest over the body actually received, the body is not
+   covered at all.
+6. **It is fresh.** `created` is required, no older than `max_age` and no further in the future than
+   `leeway`, and `expires`, if set, has not passed.
+
+Signatures are matched on their key and coverage, never their label: labels are the signer's
+choice, and a proxy may add a signature of its own (section 4.3), which is ignored rather than
+fatal.
+
+A failure is a 401, typed `https://apiguide.dev/errors/unauthorized`, whose detail names the check
+that failed but nothing that would help forge a signature. It carries `Accept-Signature`
+(section 5.1), saying what to sign next time. Signature fields that do not parse are a 400.
+
+`nonce` uniqueness is not tracked: `require_nonce` checks one is present, and a short `max_age`
+limits replay. Track nonces in your application if a replay inside that window matters.
+
+### Signing responses
+
+```php
+Route::get('orders/{order}', ShowOrder::class)->middleware('signature.sign'); // or signature.sign:other-key
+```
+
+Covers `@status`, `Content-Type`, a `Content-Digest` of the body (added if missing), and the
+request's method and path with `req` (section 2.4), so a response cannot be passed off as the
+answer to a different request.
+
+### Algorithms
+
+| Algorithm | Keys | PHP |
+|---|---|---|
+| `hmac-sha256` | `secret` (prefix with `base64:` to give it encoded) | any |
+| `ed25519` | PEM, or raw sodium keys | any, through sodium |
+| `ecdsa-p256-sha256`, `ecdsa-p384-sha384` | PEM | any |
+| `rsa-v1_5-sha256` | PEM | any |
+| `rsa-pss-sha512` | An RSA-PSS key (`openssl genpkey -algorithm RSA-PSS`) | any |
+| | A plain RSA key | 8.5 or later |
+
+PHP's OpenSSL binding only gained a way to ask for PSS padding in PHP 8.5. An RSA-PSS key carries
+the padding in its type, so it works everywhere; a plain RSA key used for `rsa-pss-sha512` before
+8.5 is refused with an explanation rather than signed with the wrong padding.
+
+To find keys somewhere other than config, per client, from a database or a JWKS endpoint, bind your
+own `JustSteveKing\Toolbox\MessageSignatures\Contracts\KeyResolver`.
+
+### Conformance
+
+The signature base is built exactly as section 2.5 describes, including the `sf`, `key` and `bs`
+field parameters, `@query-param`, and `req`, and is checked against every test case in the RFC's
+Appendix B, byte for byte. The signatures the RFC publishes verify, and the deterministic ones,
+HMAC and Ed25519, are reproduced exactly. The Structured Field parser underneath passes all 2,142
+cases in the [HTTP working group's test suite](https://github.com/httpwg/structured-field-tests).
+
+Trailer fields (`tr`) are not supported: PHP does not see a request's trailers.
+
+### Moving from juststeveking/laravel-webhooks
+
+That package signed webhooks with an HMAC in a `Signature` header of its own design. This does the
+same job with the standard, so any receiver that speaks RFC 9421 can verify it:
+
+```php
+// Before
+Webhook::to($url)->with($payload)->send();
+
+Webhook::to($url)
+    ->with($payload)
+    ->intercept(fn (PendingRequest $request) => $request->withToken($token))
+    ->queue('webhooks');
+
+// After
+Http::withSignature('webhooks')->post($url, $payload);
+
+SendWebhook::dispatch($url, $payload)->onQueue('webhooks');
+
+// where SendWebhook::handle() does:
+Http::withSignature('webhooks')->withToken($token)->post($this->url, $this->payload);
+```
+
+Queueing and retrying deliveries is Laravel's job: put `$tries` and `$backoff` on the queued job.
+`notSigned()` has no equivalent; leave out `withSignature()`. Receivers verifying the old
+`Signature` header need updating to RFC 9421; `signature.verify` is that receiver for Laravel.
+
 ## Negotiation
 
 [RFC 9110 §12](https://www.rfc-editor.org/rfc/rfc9110#section-12),
@@ -1072,6 +1221,14 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `store` | default store | Cache store for statuses |
 | `mergePatch` | | | No options. Opt in per route with `merge-patch` |
 | `digests` | | | No options. Opt in per route with `digest.verify` and `digest.respond` |
+| `messageSignatures` | `keys` | `[]` | Keys by keyid: `algorithm`, and `secret`, `private_key` or `public_key` |
+| | `verify.required` | `['@method', '@authority', '@path']` | Components every accepted signature covers |
+| | `verify.max_age` | `300` | Seconds a signature's `created` may be in the past |
+| | `verify.leeway` | `30` | Seconds it may be in the future |
+| | `verify.cover_content` | `true` | Require and check `content-digest` on a request with a body |
+| | `verify.tag` | `null` | A tag every accepted signature carries |
+| | `verify.require_nonce` | `false` | Require a `nonce` |
+| | `sign.key` | `null` | The key `signature.sign` uses when none is named |
 | `rateLimitHeaders` | `legacy_headers` | `true` | Keep Laravel's `X-RateLimit-*` headers |
 | `negotiation` | `request_id_header` | `X-Request-Id` | Request ID header name; `false` turns request IDs off |
 | | `trust_request_id` | `true` | Keep a well-formed incoming request ID |
@@ -1090,6 +1247,8 @@ Every option, with its default. Options are passed inline to the feature's metho
 | `merge-patch` | Merge Patch | 415 with `Accept-Patch` for any other PATCH format |
 | `digest.verify` | Digest Fields | Checks `Content-Digest` and `Repr-Digest`; `digest.verify:required` for 400 without one |
 | `digest.respond` | Digest Fields | Adds the digests a client wants; `digest.respond:always` for `Repr-Digest` on every response |
+| `signature.verify` | Message Signatures | 401 without a valid signature meeting the verify policy |
+| `signature.sign` | Message Signatures | Signs the response; `signature.sign:key-id` names the key |
 | `produces` | Negotiation | 406; `produces:application/json` |
 | `consumes` | Negotiation | 415; `consumes:application/json,application/merge-patch+json` |
 

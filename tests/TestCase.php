@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Tests;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Testing\TestResponse;
 use JustSteveKing\Toolbox\ApiToolboxServiceProvider;
 use JustSteveKing\Toolbox\Features;
@@ -29,6 +30,7 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         TestResponse::flushMacros();
+        PendingRequest::flushMacros();
 
         parent::setUp();
     }

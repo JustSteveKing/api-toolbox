@@ -7,9 +7,11 @@ use JustSteveKing\Toolbox\Tests\TestCase;
 use JustSteveKing\Toolbox\Tests\WithApplicationRendererTestCase;
 use JustSteveKing\Toolbox\Tests\WithOptionsTestCase;
 use JustSteveKing\Toolbox\Tests\WithoutFeaturesTestCase;
+use JustSteveKing\Toolbox\Tests\WithSignatureKeysTestCase;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit', 'Memory');
 pest()->extend(WithoutFeaturesTestCase::class)->in('Disabled');
 pest()->extend(WithApplicationRendererTestCase::class)->in('Override');
 pest()->extend(WithOptionsTestCase::class)->in('Options');
 pest()->extend(OutsideTestsTestCase::class)->in('Production');
+pest()->extend(WithSignatureKeysTestCase::class)->in('Signatures');

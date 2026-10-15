@@ -44,6 +44,8 @@ final class Features
 
     public const string DIGESTS = 'digests';
 
+    public const string MESSAGE_SIGNATURES = 'message-signatures';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
@@ -193,6 +195,20 @@ final class Features
     }
 
     /**
+     * HTTP Message Signatures: verify signed requests with "signature.verify", sign responses
+     * with "signature.sign", and sign outgoing HTTP client requests, such as webhooks, with
+     * Http::withSignature().
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9421
+     *
+     * @param  array{keys?: array<string, array<string, string|null>>, verify?: array<string, mixed>, sign?: array{key?: string|null}}  $options
+     */
+    public static function messageSignatures(array $options = []): string
+    {
+        return self::withOptions(self::MESSAGE_SIGNATURES, $options);
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -211,6 +227,7 @@ final class Features
             self::ASYNC_OPERATIONS,
             self::MERGE_PATCH,
             self::DIGESTS,
+            self::MESSAGE_SIGNATURES,
         ];
     }
 

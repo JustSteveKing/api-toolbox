@@ -24,5 +24,6 @@ return [
         Features::asyncOperations(),
         Features::mergePatch(),
         Features::digests(),
+        Features::messageSignatures(),
     ],
 ];

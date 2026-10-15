@@ -56,8 +56,16 @@ describe('verifying requests', function (): void {
             ->assertJsonPath('invalid_digests.0', ['algorithm' => 'sha-512', 'header' => 'Repr-Digest', 'reason' => 'digest value is not 64 bytes long']);
     });
 
-    it('refuses RFC 9530 Appendix B.5\'s own value, whose base64 has a stray "="', function (): void {
+    it('refuses RFC 9530 Appendix B.5 own value as a field that does not parse, with a plain 400', function (): void {
+        // The stray "=" is not valid base64, and RFC 9651 says that fails the whole field, which
+        // the draft says its problem types do not cover.
         putWith($this, ['Repr-Digest' => 'sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg==:'])
+            ->assertStatus(400)
+            ->assertProblemType('about:blank', 400);
+    });
+
+    it('refuses a digest value that is not a Byte Sequence as invalid', function (): void {
+        putWith($this, ['Repr-Digest' => 'sha-256="not bytes"'])
             ->assertStatus(400)
             ->assertJsonPath('invalid_digests.0.reason', 'digest value is not a Byte Sequence');
     });

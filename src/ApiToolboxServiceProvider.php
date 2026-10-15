@@ -13,6 +13,7 @@ use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
 use JustSteveKing\Toolbox\Digest\DigestServiceProvider;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyServiceProvider;
 use JustSteveKing\Toolbox\MergePatch\MergePatchServiceProvider;
+use JustSteveKing\Toolbox\MessageSignatures\MessageSignaturesServiceProvider;
 use JustSteveKing\Toolbox\Negotiation\NegotiationServiceProvider;
 use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider;
@@ -44,6 +45,7 @@ final class ApiToolboxServiceProvider extends ServiceProvider
         Features::ASYNC_OPERATIONS => AsyncOperationsServiceProvider::class,
         Features::MERGE_PATCH => MergePatchServiceProvider::class,
         Features::DIGESTS => DigestServiceProvider::class,
+        Features::MESSAGE_SIGNATURES => MessageSignaturesServiceProvider::class,
     ];
 
     public function register(): void

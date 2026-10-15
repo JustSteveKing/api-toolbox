@@ -57,7 +57,7 @@ it('survives config:cache with the published stub', function (): void {
 
     $cached = eval('return '.var_export($config, true).';');
 
-    expect($cached['features'])->toBe(['problem-details', 'deprecation', 'conditional-requests', 'pagination', 'idempotency', 'negotiation', 'preferences', 'async-operations', 'merge-patch', 'digests'])
+    expect($cached['features'])->toBe(['problem-details', 'deprecation', 'conditional-requests', 'pagination', 'idempotency', 'negotiation', 'preferences', 'async-operations', 'merge-patch', 'digests', 'message-signatures'])
         ->and(config(Features::OPTIONS_KEY.'.problem-details'))
         ->toBe(['type_base_uri' => '/problems', 'paths' => ['api/*'], 'apiguide' => true, 'www_authenticate' => 'Bearer'])
         ->and(config(Features::OPTIONS_KEY.'.deprecation'))

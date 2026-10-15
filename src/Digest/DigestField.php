@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Digest;
 
+use JustSteveKing\Toolbox\Support\DigestAlgorithm;
+use JustSteveKing\Toolbox\Support\StructuredFields\InnerList;
+use JustSteveKing\Toolbox\Support\StructuredFields\Item;
+use JustSteveKing\Toolbox\Support\StructuredFields\Parser;
+use JustSteveKing\Toolbox\Support\StructuredFields\StructuredFieldException;
+
 /**
  * Content-Digest and Repr-Digest (RFC 9530, sections 2 and 3) are Dictionaries whose keys name a
  * hashing algorithm and whose values are Byte Sequences:
@@ -14,60 +20,19 @@ namespace JustSteveKing\Toolbox\Digest;
  */
 final class DigestField
 {
-    private const string KEY = '[a-z*][a-z0-9_\-.*]*';
-
     /**
-     * Each member's raw value, or null when the field is not a Dictionary (RFC 9651, section
-     * 4.2.2). Parameters on members are allowed and ignored.
+     * The members, or null when the field is not a Dictionary (RFC 9651, section 4.2.2).
      *
      * @param  list<string>  $fieldValues
-     * @return array<string, string>|null
+     * @return array<string, Item|InnerList>|null
      */
     public static function parse(array $fieldValues): ?array
     {
-        $field = trim(implode(', ', $fieldValues), ' ');
-        $members = [];
-
-        while ($field !== '') {
-            if (preg_match('/^('.self::KEY.')(?:=(:[A-Za-z0-9+\/=]*:|-?\d{1,15}|"(?:[^"\\\\]|\\\\.)*"|\?[01]|[A-Za-z*][!#$%&\'*+\-.^_`|~0-9A-Za-z:\/]*))?((?:;[ ]*'.self::KEY.'(?:=[^,;]*)?)*)\s*/', $field, $match) !== 1) {
-                return null;
-            }
-
-            // RFC 9651 section 4.2.2: a later duplicate key overwrites an earlier one.
-            // A key with no value is a Boolean true (RFC 9651, section 4.2.2).
-            $members[$match[1]] = $match[2] !== '' ? $match[2] : '?1';
-            $field = substr($field, strlen($match[0]));
-
-            if ($field === '') {
-                break;
-            }
-
-            if ($field[0] !== ',') {
-                return null;
-            }
-
-            $field = ltrim(substr($field, 1), " \t");
-
-            if ($field === '') {
-                return null;
-            }
-        }
-
-        return $members;
-    }
-
-    /**
-     * The decoded bytes of a Byte Sequence value, or null when the value is not one.
-     */
-    public static function bytes(string $value): ?string
-    {
-        if (preg_match('/^:([A-Za-z0-9+\/=]*):$/', $value, $match) !== 1) {
+        try {
+            return Parser::dictionary($fieldValues);
+        } catch (StructuredFieldException) {
             return null;
         }
-
-        $decoded = base64_decode($match[1], true);
-
-        return $decoded === false ? null : $decoded;
     }
 
     public static function serialize(DigestAlgorithm $algorithm, string $content): string
@@ -89,11 +54,12 @@ final class DigestField
         $bestWeight = 0;
 
         foreach ([DigestAlgorithm::Sha512, DigestAlgorithm::Sha256] as $algorithm) {
-            $weight = $members[$algorithm->value] ?? null;
+            $member = $members[$algorithm->value] ?? null;
+            $weight = $member instanceof Item && is_int($member->value) ? $member->value : 0;
 
-            if ($weight !== null && ctype_digit($weight) && (int) $weight > $bestWeight && (int) $weight <= 10) {
+            if ($weight > $bestWeight && $weight <= 10) {
                 $best = $algorithm;
-                $bestWeight = (int) $weight;
+                $bestWeight = $weight;
             }
         }
 

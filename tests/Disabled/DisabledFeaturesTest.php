@@ -154,3 +154,10 @@ it('leaves Laravel\'s cursor resolver alone', function (): void {
 
     expect(CursorPaginator::resolveCurrentCursor())->toBeInstanceOf(Cursor::class);
 });
+
+it('registers no signature aliases, keys or HTTP client macro', function (): void {
+    expect(app()->getProviders(JustSteveKing\Toolbox\MessageSignatures\MessageSignaturesServiceProvider::class))->toBe([])
+        ->and(app()->bound(JustSteveKing\Toolbox\MessageSignatures\Contracts\KeyResolver::class))->toBeFalse()
+        ->and(app(Router::class)->getMiddleware())->not->toHaveKeys(['signature.verify', 'signature.sign'])
+        ->and(Illuminate\Http\Client\PendingRequest::hasMacro('withSignature'))->toBeFalse();
+});

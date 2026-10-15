@@ -6,8 +6,8 @@ namespace JustSteveKing\Toolbox\Digest\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use JustSteveKing\Toolbox\Digest\DigestAlgorithm;
 use JustSteveKing\Toolbox\Digest\DigestField;
+use JustSteveKing\Toolbox\Support\DigestAlgorithm;
 use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 

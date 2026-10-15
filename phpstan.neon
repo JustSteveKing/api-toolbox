@@ -3,8 +3,11 @@ includes:
 
 parameters:
     level: max
-    # Laravel 13's floor. Catches syntax and functions newer than 8.3 on a newer local PHP.
-    phpVersion: 80300
+    # Every PHP version the package supports: Laravel 13's floor to 8.5. Code is checked against
+    # the whole range, so 8.5-only calls (openssl_sign()'s padding argument) need a version guard.
+    phpVersion:
+        min: 80300
+        max: 80599
     paths:
         - src
         - config
