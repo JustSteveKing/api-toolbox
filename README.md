@@ -81,6 +81,23 @@ Or inject `JustSteveKing\Toolbox\Contracts\EnabledFeatures`.
 The config follows Laravel Fortify's `Features` design, and works with `php artisan config:cache`
 for the same reason Fortify's does.
 
+### AI agents
+
+The package ships a [Laravel Boost](https://laravel.com/docs/boost) guideline and skill, so a coding
+agent working in your application uses these features instead of hand-building error JSON,
+custom headers or HMAC checks. With Boost installed, run:
+
+```bash
+php artisan boost:install   # or boost:update, if Boost is already set up
+```
+
+The guideline (`resources/boost/guidelines/core.blade.php`) is always loaded and short: check
+which features are enabled, throw problems rather than returning error JSON, and which standard
+to reach for. The `api-toolbox-development` skill is loaded when an agent works on an endpoint,
+with a reference per area: errors, caching and pagination, writes, signatures and digests, API
+lifecycle, and testing. A test checks that every class, constant, middleware alias, assertion
+and method they mention exists, and that every PHP snippet parses.
+
 ### Stability
 
 A feature built on an IETF draft that is still moving is marked experimental, here and in the
