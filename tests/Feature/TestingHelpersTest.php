@@ -102,6 +102,31 @@ describe('assertLinkHeader', function (): void {
     ])->throws(AssertionFailedError::class);
 });
 
+describe('conditional request assertions', function (): void {
+    it('pass for well-formed responses', function (): void {
+        fakeResponse(headers: ['ETag' => '"xyzzy"'])->assertETag()->assertETag('"xyzzy"', weak: false);
+        fakeResponse(headers: ['ETag' => 'W/"xyzzy"'])->assertETag(weak: true);
+        fakeResponse(headers: ['ETag' => '""'])->assertETag();
+        fakeResponse(status: 304)->assertNotModified();
+        fakeResponse(status: 412)->assertPreconditionFailed();
+        fakeResponse('Retry with If-Match.', 428, ['Cache-Control' => 'no-store, private'])->assertPreconditionRequired();
+    });
+
+    it('fail', function (Closure $assert): void {
+        $assert();
+    })->with([
+        'no ETag' => fn () => fakeResponse()->assertETag(),
+        'unquoted ETag' => fn () => fakeResponse(headers: ['ETag' => 'xyzzy'])->assertETag(),
+        'lowercase weak prefix' => fn () => fakeResponse(headers: ['ETag' => 'w/"xyzzy"'])->assertETag(),
+        'quote inside ETag' => fn () => fakeResponse(headers: ['ETag' => '"xy"zzy"'])->assertETag(),
+        'strong when weak expected' => fn () => fakeResponse(headers: ['ETag' => '"xyzzy"'])->assertETag(weak: true),
+        'different ETag' => fn () => fakeResponse(headers: ['ETag' => '"a"'])->assertETag('"b"'),
+        '200 not 304' => fn () => fakeResponse()->assertNotModified(),
+        '428 without explanation' => fn () => fakeResponse('', 428, ['Cache-Control' => 'no-store'])->assertPreconditionRequired(),
+        '428 a cache could store' => fn () => fakeResponse('Retry with If-Match.', 428)->assertPreconditionRequired(),
+    ])->throws(AssertionFailedError::class);
+});
+
 describe('Pest expectations', function (): void {
     it('mirror the macros', function (): void {
         expect(fakeProblem(['type' => 'https://example.com/a', 'status' => 403]))
@@ -116,6 +141,11 @@ describe('Pest expectations', function (): void {
             ->toBeDeprecated('2023-06-30T23:59:59Z')
             ->toHaveSunset(link: 'https://a.example')
             ->toHaveLink('sunset');
+
+        expect(fakeResponse(headers: ['ETag' => '"xyzzy"']))->toHaveETag('"xyzzy"');
+        expect(fakeResponse(status: 304))->toBeNotModified();
+        expect(fakeResponse(status: 412))->toBePreconditionFailed();
+        expect(fakeResponse('Retry.', 428, ['Cache-Control' => 'no-store']))->toBePreconditionRequired();
     });
 
     it('fail on something that is not a response', function (): void {

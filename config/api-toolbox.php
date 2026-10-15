@@ -16,5 +16,7 @@ return [
     'features' => [
         Features::problemDetails(),
         Features::deprecation(),
+        Features::conditionalRequests(),
+        Features::pagination(),
     ],
 ];

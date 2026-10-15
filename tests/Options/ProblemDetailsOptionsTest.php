@@ -26,3 +26,17 @@ it('replaces the default paths rather than adding to them', function (): void {
 
     expect($response->headers->get('Content-Type'))->not->toContain('problem+json');
 });
+
+it('uses about:blank for plain HTTP errors when the catalogue is off', function (): void {
+    Route::get('v1/gone', fn () => abort(410));
+
+    $this->getJson('v1/gone')
+        ->assertJsonPath('type', 'about:blank')
+        ->assertJsonPath('title', 'Gone');
+});
+
+it('resolves the validation type against the base URI when the catalogue is off', function (): void {
+    Route::post('v1/leads', fn () => throw Illuminate\Validation\ValidationException::withMessages(['name' => 'Required.']));
+
+    $this->postJson('v1/leads')->assertJsonPath('type', 'https://docs.example.com/problems/validation-failed');
+});

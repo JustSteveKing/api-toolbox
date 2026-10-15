@@ -14,6 +14,7 @@ abstract class WithOptionsTestCase extends TestCase
             Features::problemDetails([
                 'type_base_uri' => 'https://docs.example.com/problems/',
                 'paths' => ['v1/*'],
+                'apiguide' => false,
             ]),
             Features::deprecation(['global' => false]),
         ];

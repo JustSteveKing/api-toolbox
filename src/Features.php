@@ -26,12 +26,19 @@ final class Features
 
     public const string DEPRECATION = 'deprecation';
 
+    public const string CONDITIONAL_REQUESTS = 'conditional-requests';
+
+    public const string PAGINATION = 'pagination';
+
     /**
      * Render exceptions as RFC 9457 problem details.
      *
      * @see https://www.rfc-editor.org/rfc/rfc9457
      *
-     * @param  array{type_base_uri?: string, paths?: list<string>}  $options
+     * Plain HTTP errors and validation failures use the apiguide.dev error catalogue as their
+     * type unless 'apiguide' is false, in which case they use about:blank and the base URI.
+     *
+     * @param  array{type_base_uri?: string, paths?: list<string>, apiguide?: bool}  $options
      */
     public static function problemDetails(array $options = []): string
     {
@@ -53,6 +60,28 @@ final class Features
     }
 
     /**
+     * ETags, Last-Modified, 304 Not Modified, 412 Precondition Failed and 428 Precondition
+     * Required, opted into per route with the "conditional" middleware group.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc9110#section-13
+     * @see https://www.rfc-editor.org/rfc/rfc6585#section-3
+     */
+    public static function conditionalRequests(): string
+    {
+        return self::CONDITIONAL_REQUESTS;
+    }
+
+    /**
+     * Cursor pagination that puts next, prev and first in Link headers rather than in the body.
+     *
+     * @see https://www.rfc-editor.org/rfc/rfc8288
+     */
+    public static function pagination(): string
+    {
+        return self::PAGINATION;
+    }
+
+    /**
      * Every feature this version of the package knows about.
      *
      * @return list<string>
@@ -62,6 +91,8 @@ final class Features
         return [
             self::PROBLEM_DETAILS,
             self::DEPRECATION,
+            self::CONDITIONAL_REQUESTS,
+            self::PAGINATION,
         ];
     }
 

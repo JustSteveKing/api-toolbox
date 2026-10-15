@@ -9,7 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use JustSteveKing\Toolbox\Deprecation\Contracts\DeprecationSource;
 use JustSteveKing\Toolbox\Deprecation\Notice;
+use JustSteveKing\Toolbox\Support\Link;
 use Symfony\Component\HttpFoundation\Response;
+use UnexpectedValueException;
 
 /**
  * Adds Deprecation (RFC 9745), Sunset (RFC 8594) and their Link relations to the response.
@@ -28,8 +30,11 @@ final readonly class AddDeprecationHeaders
 
     public function handle(Request $request, Closure $next): Response
     {
-        /** @var Response $response */
         $response = $next($request);
+
+        if (! $response instanceof Response) {
+            throw new UnexpectedValueException('Expected the next middleware to return a response.');
+        }
 
         $route = $request->route();
 
@@ -65,11 +70,11 @@ final readonly class AddDeprecationHeaders
 
         // Appended rather than set, so links other code has already added survive.
         if ($notice->deprecationLink !== null) {
-            $response->headers->set('Link', "<{$notice->deprecationLink}>; rel=\"deprecation\"", false);
+            $response->headers->set('Link', (new Link($notice->deprecationLink, 'deprecation'))->toHeaderValue(), false);
         }
 
         if ($notice->sunsetLink !== null) {
-            $response->headers->set('Link', "<{$notice->sunsetLink}>; rel=\"sunset\"", false);
+            $response->headers->set('Link', (new Link($notice->sunsetLink, 'sunset'))->toHeaderValue(), false);
         }
     }
 }

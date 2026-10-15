@@ -29,6 +29,8 @@ arch('no debugging calls are left behind')
 $features = [
     'JustSteveKing\Toolbox\ProblemDetails',
     'JustSteveKing\Toolbox\Deprecation',
+    'JustSteveKing\Toolbox\ConditionalRequests',
+    'JustSteveKing\Toolbox\Pagination',
 ];
 
 foreach ($features as $feature) {

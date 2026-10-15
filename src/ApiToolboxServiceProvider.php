@@ -6,8 +6,10 @@ namespace JustSteveKing\Toolbox;
 
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\ServiceProvider;
+use JustSteveKing\Toolbox\ConditionalRequests\ConditionalRequestsServiceProvider;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Deprecation\DeprecationServiceProvider;
+use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\Testing\TestingServiceProvider;
 
@@ -26,6 +28,8 @@ final class ApiToolboxServiceProvider extends ServiceProvider
     private const array PROVIDERS = [
         Features::PROBLEM_DETAILS => ProblemDetailsServiceProvider::class,
         Features::DEPRECATION => DeprecationServiceProvider::class,
+        Features::CONDITIONAL_REQUESTS => ConditionalRequestsServiceProvider::class,
+        Features::PAGINATION => PaginationServiceProvider::class,
     ];
 
     public function register(): void

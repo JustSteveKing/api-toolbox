@@ -10,6 +10,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Testing\TestResponse;
 use JustSteveKing\Toolbox\Contracts\EnabledFeatures;
 use JustSteveKing\Toolbox\Features;
+use JustSteveKing\Toolbox\Testing\Assertions\ConditionalRequestAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\DeprecationAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\LinkAssertions;
 use JustSteveKing\Toolbox\Testing\Assertions\ProblemDetailsAssertions;
@@ -35,6 +36,14 @@ final class TestingServiceProvider extends ServiceProvider
 
         if ($features->enabled(Features::DEPRECATION)) {
             $this->deprecation();
+        }
+
+        if ($features->enabled(Features::CONDITIONAL_REQUESTS)) {
+            $this->conditionalRequests();
+        }
+
+        // Link headers come from more than one feature.
+        if ($features->enabled(Features::DEPRECATION) || $features->enabled(Features::PAGINATION)) {
             $this->links();
         }
     }
@@ -79,6 +88,38 @@ final class TestingServiceProvider extends ServiceProvider
 
         $this->expectation('toBeDeprecated', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertDeprecated($response, $at, $link));
         $this->expectation('toHaveSunset', static fn (TestResponse $response, DateTimeInterface|string|null $at = null, ?string $link = null) => DeprecationAssertions::assertSunset($response, $at, $link));
+    }
+
+    private function conditionalRequests(): void
+    {
+        TestResponse::macro('assertETag', function (?string $etag = null, ?bool $weak = null): TestResponse {
+            ConditionalRequestAssertions::assertETag($this, $etag, $weak);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertNotModified', function (): TestResponse {
+            ConditionalRequestAssertions::assertNotModified($this);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertPreconditionFailed', function (): TestResponse {
+            ConditionalRequestAssertions::assertPreconditionFailed($this);
+
+            return $this;
+        });
+
+        TestResponse::macro('assertPreconditionRequired', function (): TestResponse {
+            ConditionalRequestAssertions::assertPreconditionRequired($this);
+
+            return $this;
+        });
+
+        $this->expectation('toHaveETag', static fn (TestResponse $response, ?string $etag = null, ?bool $weak = null) => ConditionalRequestAssertions::assertETag($response, $etag, $weak));
+        $this->expectation('toBeNotModified', static fn (TestResponse $response) => ConditionalRequestAssertions::assertNotModified($response));
+        $this->expectation('toBePreconditionFailed', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionFailed($response));
+        $this->expectation('toBePreconditionRequired', static fn (TestResponse $response) => ConditionalRequestAssertions::assertPreconditionRequired($response));
     }
 
     private function links(): void

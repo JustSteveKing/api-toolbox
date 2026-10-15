@@ -27,7 +27,7 @@ use JustSteveKing\Toolbox\Features;
 ],
 ```
 
-If you never publish the config, Problem Details and Deprecation are on with their defaults.
+If you never publish the config, every stable feature is on with its defaults.
 
 To check a feature at runtime:
 
@@ -60,8 +60,37 @@ a media type, `application/problem+json`.
 Features::problemDetails([
     'type_base_uri' => 'https://docs.example.com/problems', // default: /problems
     'paths' => ['api/*'],                                   // default: ['api/*']
+    'apiguide' => true,                                     // default: true
 ]),
 ```
+
+### apiguide.dev
+
+Every problem this package produces itself has a type from the
+[apiguide.dev error catalogue](https://apiguide.dev/errors), wherever the catalogue has an entry
+for it. Each type URI resolves to a page explaining when the error happens and how a client
+recovers, which is what section 3.1.1 asks a type URI to dereference to.
+
+```json
+{
+  "type": "https://apiguide.dev/errors/precondition-failed",
+  "title": "Precondition Failed",
+  "status": 412,
+  "detail": "The resource has changed since you last fetched it. Fetch it again and retry with its current ETag."
+}
+```
+
+Your own problem types can use the catalogue too, through `JustSteveKing\Toolbox\Support\ApiGuide`:
+
+```php
+#[ProblemType(ApiGuide::ACCOUNT_FROZEN, title: 'Account Frozen', status: 403)]
+final class AccountFrozen extends ProblemException {}
+```
+
+Set `'apiguide' => false` to use `about:blank` with the status phrase for plain HTTP errors
+instead (section 4.2.1), and to resolve the validation type against `type_base_uri`. Types a
+feature names for its own errors, such as `invalid-pagination-cursor`, stay on apiguide.dev
+either way, because they say more than the status does.
 
 ### Typed problems
 
@@ -104,13 +133,16 @@ A problem class can inherit its `#[ProblemType]` from an abstract parent.
 | Exception | Status | type |
 |---|---|---|
 | `ProblemException` | from `#[ProblemType]` | resolved from `#[ProblemType]` |
-| `ValidationException` | 422 | `validation-error`, with an `errors` extension |
-| `AuthenticationException` | 401 | `about:blank` |
-| Any HTTP exception, including `abort()`, model not found, authorization | its own | `about:blank` |
-| Anything else | 500 | `about:blank` |
+| `ValidationException` | 422 | `https://apiguide.dev/errors/validation-failed` |
+| `AuthenticationException` | 401 | `https://apiguide.dev/errors/unauthorized` |
+| Any HTTP exception, including `abort()`, model not found, authorization | its own | the catalogue entry for the status, or `about:blank` |
+| Anything else | 500 | `https://apiguide.dev/errors/internal-server-error` |
 
-With `about:blank` the title is the status phrase, as section 4.2.1 asks. Any headers the
-exception carries, such as `Retry-After`, are kept.
+A status gets a catalogue type only when one entry is the plain meaning of that status: 404 is
+`resource-not-found`, 412 is `precondition-failed`, 429 is `rate-limit-exceeded`. Statuses with
+several candidates, such as 400 and 422, get `about:blank` with the status phrase, as section
+4.2.1 asks, rather than a type that claims more than the status says. Any headers the exception
+carries, such as `Retry-After` or `ETag`, are kept.
 
 An unexpected exception gets only `type`, `title` and `status`. Its message and trace are added
 only when `app.debug` is on, since section 5 warns against exposing implementation details.
@@ -120,25 +152,25 @@ To map an exception of your own to a problem, use Laravel's `$exceptions->map()`
 
 ### Validation errors
 
-These follow the shape of the validation example in section 3 of the RFC: one object per
-message, each with a `detail` and an RFC 6901 JSON Pointer.
+These use the `errors` member that apiguide.dev documents for its `validation-failed` type:
+Laravel's messages, keyed by field.
 
 ```json
 {
-  "type": "/problems/validation-error",
-  "title": "Your request is not valid.",
+  "type": "https://apiguide.dev/errors/validation-failed",
+  "title": "Validation Failed",
   "status": 422,
-  "detail": "The age field must be an integer. (and 1 more error)",
-  "errors": [
-    {"detail": "The age field must be an integer.", "pointer": "#/age"},
-    {"detail": "The selected profile.color is invalid.", "pointer": "#/profile/color"}
-  ]
+  "detail": "The end date field must be a date after start date.",
+  "errors": {
+    "end_date": ["The end date field must be a date after start date."]
+  }
 }
 ```
 
-The RFC's pointers locate an error "within the request's content". Laravel validates query
-parameters and content through the same keys, so here a pointer locates the field in the
-validated input, whichever part of the request it came from.
+RFC 9457's own validation example, in section 3, uses a list of `detail` and JSON Pointer
+objects instead. That example belongs to a fictional problem type. Section 3.2 lets each type
+define its extensions, and a response has to match the type its `type` member points at, so this
+follows the catalogue page.
 
 ### Type URIs
 
@@ -253,6 +285,127 @@ Not supported. Both RFCs describe a resource, and no published standard puts the
 a single field in a header. `Notice` has no dependency on routes, so whatever does eventually
 describe fields can produce it.
 
+## Conditional Requests
+
+[RFC 9110 section 13](https://www.rfc-editor.org/rfc/rfc9110#section-13),
+[RFC 6585 section 3](https://www.rfc-editor.org/rfc/rfc6585#section-3)
+
+Two clients read a document, both edit it, and the second save silently overwrites the first.
+Entity tags and preconditions stop that lost update: the client says which version it read, and
+the server refuses the write if that is no longer current. The same validators let a client
+re-fetch a resource it already has and get a bodiless 304.
+
+```php
+Features::conditionalRequests(),
+```
+
+It is opt-in per route:
+
+```php
+Route::middleware('conditional')->group(function () {
+    Route::get('documents/{document}', ShowDocument::class);
+    Route::patch('documents/{document}', UpdateDocument::class)->middleware('preconditions.required');
+});
+```
+
+| Middleware | Does |
+|---|---|
+| `conditional` | The group of the next two, in order |
+| `preconditions` | Evaluates `If-Match`, `If-None-Match`, `If-Modified-Since` and `If-Unmodified-Since` in the order section 13.2.2 sets: 412 or 304 |
+| `validators` | Adds `ETag` and `Last-Modified` to successful GET and HEAD responses. `validators:weak` makes a content-hash ETag weak |
+| `preconditions.required` | 428 for a PUT, PATCH or DELETE with no precondition. `preconditions.required:PUT,POST` names the methods |
+
+Laravel 13's `#[Middleware('conditional')]` controller attribute works too.
+
+The middleware run after route model binding, and 428 is decided before 412, wherever the route
+lists them, because the package adds them to Laravel's middleware priority.
+
+### Where validators come from
+
+A write has to be checked before it happens (section 13.1.1), so the current ETag cannot come
+from the response. It comes from the route-bound model, when it implements `HasValidators`:
+
+```php
+use JustSteveKing\Toolbox\ConditionalRequests\Concerns\HasModelValidators;
+use JustSteveKing\Toolbox\ConditionalRequests\Contracts\HasValidators;
+
+final class Document extends Model implements HasValidators
+{
+    use HasModelValidators;
+}
+```
+
+`HasModelValidators` gives a strong ETag from the model's class, key and `updated_at`, and
+`Last-Modified` from `updated_at`. Section 8.8.1 says a strong tag must change whenever the
+representation does, and that holds only while every change touches `updated_at` and two writes
+never share one. MySQL's default timestamp columns store whole seconds, so two writes in the same
+second would get the same tag. For optimistic concurrency, override `entityTagVersion()` to return
+a version column that every write increments.
+
+On a GET with no bound model, the ETag is a hash of the response content.
+
+### Behaviour worth knowing
+
+- `If-Match` uses strong comparison (section 13.1.1), so a weak ETag can never satisfy it.
+  `If-None-Match` uses weak comparison (section 13.1.2).
+- A 412 carries the current `ETag`, so the client knows what to re-fetch.
+- A 428 says how to retry, as RFC 6585 asks, and sends `Cache-Control: no-store`, because the
+  section says a 428 MUST NOT be stored by a cache.
+- `If-Match: *` fails and `If-None-Match: *` passes on a route with no bound resource, which lets
+  a PUT create without overwriting.
+- Modification times are compared in whole seconds, the resolution of an HTTP-date.
+- Validators are only added to GET and HEAD responses. Section 9.3.4 says a successful PUT MUST
+  NOT carry one unless the content was stored exactly as received, which a package cannot know.
+- GET preconditions are checked against the finished response, because only the finished
+  response knows every header a 304 has to repeat (section 15.4.5).
+- A 304 has no `Last-Modified`. Laravel's router strips it from every 304, and section 15.4.5 only
+  calls it useful when there is no ETag.
+- Entity tags are parsed by this package, not Symfony. `Request::getETags()` splits on every comma,
+  but a comma is a legal character inside an entity tag.
+- `If-Range` and `Range` are not handled: the package does not serve range requests.
+- When a precondition fails, the package always sends 412. Sections 13.1.1 and 13.1.4 allow a 2xx
+  instead when the change appears to have been applied already, but they also say a server is
+  better off sending 412 for every failure on an unsafe method.
+
+## Pagination
+
+[RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)
+
+Laravel's paginators put navigation in the body, as `links` and `meta` beside the data, so every
+client has to know that shape. Link headers carry the same navigation in a form any HTTP client
+can read, and leave the body as the items alone.
+
+```php
+Features::pagination(),
+```
+
+```php
+use JustSteveKing\Toolbox\Pagination\CursorPage;
+
+return CursorPage::of(Post::query()->cursorPaginate(20), PostResource::class);
+```
+
+```http
+Link: <https://api.example.com/posts?cursor=eyJpZCI6MjAsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0>; rel="next"
+Link: <https://api.example.com/posts>; rel="first"
+
+[{"id": 1, ...}, {"id": 2, ...}]
+```
+
+- `next` and `prev` appear when there is a page in that direction. `first` is always there, and
+  is the URL with no cursor.
+- There is no `last`: a cursor only knows its neighbours.
+- The resource class is optional. Without it, the items are serialised as they are.
+- Call `withQueryString()` on the paginator to keep filters and sorting in every link.
+
+### Invalid cursors
+
+Laravel treats a cursor it cannot decode as no cursor and serves the first page, which a client
+paging through results cannot notice. With this feature on, an undecodable cursor is a 400
+instead, typed `https://apiguide.dev/errors/invalid-pagination-cursor`, for every cursor
+paginator in the application, before any query runs. A missing or empty cursor is still the first
+page.
+
 ## Testing
 
 Assertions for every enabled feature, on Laravel's `TestResponse` and as Pest expectations.
@@ -276,7 +429,11 @@ expect($this->getJson('/api/orders'))->toBeProblem(403);
 | Deprecation | `assertDeprecated(?at, ?link)` | `toBeDeprecated(?at, ?link)` | Exactly one `Deprecation` field, a Structured Field Date (RFC 9745 §2.1), and a `rel="deprecation"` link if given |
 | | `assertSunset(?at, ?link)` | `toHaveSunset(?at, ?link)` | Exactly one `Sunset` field, an IMF-fixdate in GMT (RFC 8594 §3), not earlier than `Deprecation` (RFC 9745 §4) |
 | | `assertNotDeprecated()` | | Neither field is present |
-| | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
+| Conditional Requests | `assertETag(?etag, ?weak)` | `toHaveETag(?etag, ?weak)` | Exactly one `ETag` field, valid entity-tag syntax (RFC 9110 §8.8.3), and the tag or strength if given |
+| | `assertNotModified()` | `toBeNotModified()` | 304 with no content (RFC 9110 §15.4.5) |
+| | `assertPreconditionFailed()` | `toBePreconditionFailed()` | 412 |
+| | `assertPreconditionRequired()` | `toBePreconditionRequired()` | 428 that explains itself and carries `no-store` (RFC 6585 §3) |
+| Deprecation, Pagination | `assertLinkHeader(rel, ?uri)` | `toHaveLink(rel, ?uri)` | Every `Link` field parses (RFC 8288 §3), and one has the relation type and target |
 | | `assertNoLinkHeader(rel)` | | No `Link` with that relation type |
 
 Dates can be a `DateTimeInterface` or a string. A string without an offset is read as UTC.

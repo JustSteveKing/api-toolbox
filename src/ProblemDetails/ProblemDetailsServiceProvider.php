@@ -26,17 +26,18 @@ final class ProblemDetailsServiceProvider extends ServiceProvider
 
         $baseUri = $options['type_base_uri'] ?? BaseUriTypeResolver::DEFAULT_BASE;
         $paths = $options['paths'] ?? self::DEFAULT_PATHS;
+        $apiGuide = ($options['apiguide'] ?? true) === true;
 
         $this->app->singleton(TypeResolver::class, static fn (): TypeResolver => new BaseUriTypeResolver(
             is_string($baseUri) ? $baseUri : BaseUriTypeResolver::DEFAULT_BASE,
         ));
 
         // Bound rather than shared so app.debug is read when an exception is rendered, not once.
-        $this->app->bind(ProblemFactory::class, static function (Application $app): ProblemFactory {
+        $this->app->bind(ProblemFactory::class, static function (Application $app) use ($apiGuide): ProblemFactory {
             /** @var Repository $config */
             $config = $app->make('config');
 
-            return new ProblemFactory($app->make(TypeResolver::class), (bool) $config->get('app.debug'));
+            return new ProblemFactory($app->make(TypeResolver::class), (bool) $config->get('app.debug'), $apiGuide);
         });
 
         $this->app->bind(ProblemRenderer::class, static fn (Application $app): ProblemRenderer => new ProblemRenderer(

@@ -22,11 +22,15 @@ return [
             'type_base_uri' => '/problems',
             // Paths that always get problem details, whatever the request's Accept header.
             'paths' => ['api/*'],
+            // Type plain HTTP errors with the apiguide.dev catalogue rather than about:blank.
+            'apiguide' => true,
         ]),
         Features::deprecation([
             // Run on every request; turn off to add the "deprecation" middleware per route instead.
             'global' => true,
         ]),
+        Features::conditionalRequests(),
+        Features::pagination(),
     ],
 
 ];

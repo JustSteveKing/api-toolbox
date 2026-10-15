@@ -6,19 +6,29 @@ namespace JustSteveKing\Toolbox\ProblemDetails;
 
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
+use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\ProblemDetails\Contracts\TypeResolver;
+use JustSteveKing\Toolbox\Support\ApiGuide;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 final readonly class ProblemFactory
 {
-    public const string VALIDATION_TYPE = 'validation-error';
+    /**
+     * The slug used for validation errors when the apiguide.dev catalogue is off.
+     */
+    public const string VALIDATION_TYPE = 'validation-failed';
 
-    public const string VALIDATION_TITLE = 'Your request is not valid.';
+    public const string VALIDATION_TITLE = 'Validation Failed';
 
+    /**
+     * @param  bool  $apiGuide  Use apiguide.dev types for plain HTTP errors and validation,
+     *                          rather than about:blank and a slug against the base URI.
+     */
     public function __construct(
         private TypeResolver $types,
         private bool $debug = false,
+        private bool $apiGuide = true,
     ) {}
 
     /**
@@ -33,10 +43,15 @@ final readonly class ProblemFactory
         return match (true) {
             $e instanceof ProblemException => $this->fromProblemException($e),
             $e instanceof ValidationException => $this->fromValidationException($e),
-            $e instanceof AuthenticationException => Problem::forStatus(401, $this->message($e)),
-            $e instanceof HttpExceptionInterface => $e->getStatusCode() >= 400
-                ? Problem::forStatus($e->getStatusCode(), $this->message($e))
-                : null,
+            $e instanceof AuthenticationException => $this->forStatus(401, $this->message($e)),
+            $e instanceof HttpExceptionInterface && $e->getStatusCode() < 400 => null,
+            $e instanceof HttpExceptionInterface && $e instanceof HasProblemType => new Problem(
+                status: $e->getStatusCode(),
+                type: $this->types->resolve($e->problemType()),
+                title: $e->problemTitle(),
+                detail: $this->message($e),
+            ),
+            $e instanceof HttpExceptionInterface => $this->forStatus($e->getStatusCode(), $this->message($e)),
             default => $this->fromUnexpected($e),
         };
     }
@@ -56,34 +71,45 @@ final readonly class ProblemFactory
     }
 
     /**
-     * Follows the shape of the validation example in RFC 9457 section 3: an "errors" extension
-     * holding one {detail, pointer} object per message.
-     *
-     * The RFC's pointers locate the problem "within the request's content". Laravel validates
-     * query parameters and content through the same keys, so a pointer here locates the field in
-     * the validated input, whichever part of the request it came from.
+     * The "errors" extension is the one apiguide.dev documents for its validation-failed type:
+     * Laravel's own shape, messages keyed by field. Section 3.2 lets a problem type define its
+     * extensions, and a response has to match the type its "type" points at. This is not the
+     * list of JSON Pointers in RFC 9457's section 3 example, which is an example of a fictional
+     * type rather than a requirement.
      */
     private function fromValidationException(ValidationException $e): Problem
     {
-        $errors = [];
-
-        foreach ($e->errors() as $field => $messages) {
-            foreach (is_array($messages) ? $messages : [] as $message) {
-                if (is_string($message)) {
-                    $errors[] = [
-                        'detail' => $message,
-                        'pointer' => JsonPointer::fromDotPath((string) $field),
-                    ];
-                }
-            }
-        }
+        $type = $this->apiGuide ? ApiGuide::VALIDATION_FAILED : $this->types->resolve(self::VALIDATION_TYPE);
 
         return new Problem(
             status: $e->status,
-            type: $this->types->resolve(self::VALIDATION_TYPE),
+            type: $type,
             title: self::VALIDATION_TITLE,
             detail: $this->message($e),
-            extensions: ['errors' => $errors],
+            extensions: ['errors' => $e->errors()],
+        );
+    }
+
+    /**
+     * The apiguide.dev entry for a status where there is one, otherwise about:blank with the status
+     * phrase (section 4.2.1).
+     *
+     * @param  array<string, mixed>  $extensions
+     */
+    private function forStatus(int $status, ?string $detail = null, array $extensions = []): Problem
+    {
+        $type = $this->apiGuide ? ApiGuide::forStatus($status) : null;
+
+        if ($type === null) {
+            return Problem::forStatus($status, $detail, $extensions);
+        }
+
+        return new Problem(
+            status: $status,
+            type: $type,
+            title: ApiGuide::title($type),
+            detail: $detail,
+            extensions: $extensions,
         );
     }
 
@@ -94,10 +120,10 @@ final readonly class ProblemFactory
     private function fromUnexpected(Throwable $e): Problem
     {
         if (! $this->debug) {
-            return Problem::forStatus(500);
+            return $this->forStatus(500);
         }
 
-        return Problem::forStatus(500, $this->message($e), [
+        return $this->forStatus(500, $this->message($e), [
             'exception' => $e::class,
             'file' => $e->getFile(),
             'line' => $e->getLine(),

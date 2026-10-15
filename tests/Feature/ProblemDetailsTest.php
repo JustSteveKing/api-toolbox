@@ -36,50 +36,91 @@ it('renders a typed problem exactly as RFC 9457 section 3 shows it', function ()
     );
 });
 
-it('maps validation errors to the errors extension with JSON pointers', function (): void {
-    Route::post('api/details', function (Request $request): void {
+it('maps validation errors to the apiguide.dev validation-failed type and its errors shape', function (): void {
+    Route::post('api/leads', function (Request $request): void {
         Validator::make($request->all(), [
-            'age' => ['required', 'integer'],
-            'profile.color' => ['required', 'in:green,red,blue'],
+            'end_date' => ['required', 'date', 'after:start_date'],
+            'start_date' => ['required', 'date'],
         ])->validate();
     });
 
-    $this->postJson('api/details', ['age' => 42.3, 'profile' => ['color' => 'yellow']])
+    $this->postJson('api/leads', ['start_date' => '2026-10-15', 'end_date' => '2026-10-01'])
         ->assertStatus(422)
         ->assertHeader('Content-Type', 'application/problem+json')
         ->assertExactJson([
-            'type' => '/problems/validation-error',
-            'title' => 'Your request is not valid.',
+            'type' => 'https://apiguide.dev/errors/validation-failed',
+            'title' => 'Validation Failed',
             'status' => 422,
-            'detail' => 'The age field must be an integer. (and 1 more error)',
+            'detail' => 'The end date field must be a date after start date.',
             'errors' => [
-                ['detail' => 'The age field must be an integer.', 'pointer' => '#/age'],
-                ['detail' => 'The selected profile.color is invalid.', 'pointer' => '#/profile/color'],
+                'end_date' => ['The end date field must be a date after start date.'],
             ],
         ]);
 });
 
-it('uses about:blank and the status phrase for plain HTTP errors', function (string $uri, Closure $throw, int $status, string $title): void {
+it('types plain HTTP errors with their apiguide.dev catalogue entry', function (string $uri, Closure $throw, int $status, string $type, string $title): void {
     Route::get($uri, $throw);
 
     $this->getJson($uri)
         ->assertStatus($status)
         ->assertHeader('Content-Type', 'application/problem+json')
-        ->assertJsonPath('type', 'about:blank')
+        ->assertJsonPath('type', $type)
         ->assertJsonPath('title', $title)
         ->assertJsonPath('status', $status);
 })->with([
-    'abort' => ['api/gone', fn () => abort(410), 410, 'Gone'],
-    'model not found' => ['api/post', fn () => throw new ModelNotFoundException, 404, 'Not Found'],
-    'authorization' => ['api/admin', fn () => throw new AuthorizationException, 403, 'Forbidden'],
-    'authentication' => ['api/me', fn () => throw new AuthenticationException, 401, 'Unauthorized'],
+    'abort' => ['api/gone', fn () => abort(410), 410, 'https://apiguide.dev/errors/gone', 'Gone'],
+    'model not found' => ['api/post', fn () => throw new ModelNotFoundException, 404, 'https://apiguide.dev/errors/resource-not-found', 'Resource Not Found'],
+    'authorization' => ['api/admin', fn () => throw new AuthorizationException, 403, 'https://apiguide.dev/errors/forbidden', 'Forbidden'],
+    'authentication' => ['api/me', fn () => throw new AuthenticationException, 401, 'https://apiguide.dev/errors/unauthorized', 'Unauthorized'],
+    'precondition failed' => ['api/doc', fn () => abort(412), 412, 'https://apiguide.dev/errors/precondition-failed', 'Precondition Failed'],
+    'precondition required' => ['api/doc2', fn () => abort(428), 428, 'https://apiguide.dev/errors/precondition-required', 'Precondition Required'],
 ]);
+
+it('falls back to about:blank where the catalogue has no single entry for the status', function (int $status, string $title): void {
+    Route::get('api/vague', fn () => abort($status));
+
+    $this->getJson('api/vague')
+        ->assertStatus($status)
+        ->assertJsonPath('type', 'about:blank')
+        ->assertJsonPath('title', $title);
+})->with([
+    [400, 'Bad Request'],
+    [402, 'Payment Required'],
+    [422, 'Unprocessable Content'],
+]);
+
+it('uses the type a feature exception names through HasProblemType', function (): void {
+    Route::get('api/cursor', fn () => throw new class extends Symfony\Component\HttpKernel\Exception\BadRequestHttpException implements JustSteveKing\Toolbox\Contracts\HasProblemType
+    {
+        public function __construct()
+        {
+            parent::__construct('The cursor parameter could not be decoded.');
+        }
+
+        public function problemType(): string
+        {
+            return JustSteveKing\Toolbox\Support\ApiGuide::INVALID_PAGINATION_CURSOR;
+        }
+
+        public function problemTitle(): string
+        {
+            return 'Invalid Pagination Cursor';
+        }
+    });
+
+    $this->getJson('api/cursor')->assertStatus(400)->assertExactJson([
+        'type' => 'https://apiguide.dev/errors/invalid-pagination-cursor',
+        'title' => 'Invalid Pagination Cursor',
+        'status' => 400,
+        'detail' => 'The cursor parameter could not be decoded.',
+    ]);
+});
 
 it('renders unknown routes under the configured paths', function (): void {
     $this->get('api/nothing-here')
         ->assertStatus(404)
         ->assertHeader('Content-Type', 'application/problem+json')
-        ->assertJsonPath('title', 'Not Found');
+        ->assertJsonPath('type', 'https://apiguide.dev/errors/resource-not-found');
 });
 
 it('keeps the headers an HTTP exception carries', function (): void {
@@ -88,7 +129,7 @@ it('keeps the headers an HTTP exception carries', function (): void {
     $this->getJson('api/limited')
         ->assertStatus(429)
         ->assertHeader('Retry-After', '30')
-        ->assertJsonPath('title', 'Too Many Requests');
+        ->assertJsonPath('type', 'https://apiguide.dev/errors/rate-limit-exceeded');
 });
 
 it('hides the message and trace of an unexpected exception outside debug mode', function (): void {
@@ -97,7 +138,11 @@ it('hides the message and trace of an unexpected exception outside debug mode', 
 
     $response = $this->getJson('api/boom')->assertStatus(500);
 
-    $response->assertExactJson(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500]);
+    $response->assertExactJson([
+        'type' => 'https://apiguide.dev/errors/internal-server-error',
+        'title' => 'Internal Server Error',
+        'status' => 500,
+    ]);
 });
 
 it('includes the message and trace of an unexpected exception in debug mode', function (): void {

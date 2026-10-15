@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
 use InvalidArgumentException;
+use JustSteveKing\Toolbox\Support\Link;
 
 /**
  * What a client should be told about a resource's deprecation and sunset.
@@ -36,10 +37,9 @@ final readonly class Notice
             ));
         }
 
-        foreach ([$deprecationLink, $sunsetLink] as $link) {
-            if ($link !== null && ($link === '' || preg_match('/[\s<>"]/', $link) === 1)) {
-                throw new InvalidArgumentException("[{$link}] cannot be written inside a Link header's angle brackets (RFC 8288, section 3).");
-            }
+        // Built once here so a bad link fails when the notice is made, not when it is sent.
+        foreach (array_filter([$deprecationLink, $sunsetLink], is_string(...)) as $link) {
+            new Link($link, 'deprecation');
         }
     }
 
