@@ -31,7 +31,7 @@ final class IdempotencyServiceProvider extends ServiceProvider
                 $app->make(Factory::class)->store(is_string($store) ? $store : null),
                 self::integer($options['ttl'] ?? null, self::DEFAULT_TTL),
                 self::integer($options['lock'] ?? null, 60),
-                array_values($app->make(Encrypter::class)->getAllKeys()),
+                array_values(array_filter($app->make(Encrypter::class)->getAllKeys(), is_string(...))),
             );
         });
 

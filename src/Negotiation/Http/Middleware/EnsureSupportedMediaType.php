@@ -66,7 +66,7 @@ final readonly class EnsureSupportedMediaType
      * its own and its controller's, so the last is the most specific. One the route excluded with
      * withoutMiddleware() never runs, so it is not counted.
      *
-     * @param  array<int, string>  $consumes
+     * @param  array<array-key, string>  $consumes
      */
     private static function applies(Request $request, array $consumes): bool
     {
@@ -91,7 +91,7 @@ final readonly class EnsureSupportedMediaType
             }
         }
 
-        return $last === null || explode(',', $last) === $consumes;
+        return $last === null || explode(',', $last) === array_values($consumes);
     }
 
     /**
