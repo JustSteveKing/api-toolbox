@@ -480,6 +480,11 @@ final class Document extends Model implements HasValidators
 }
 ```
 
+On a nested route, such as `folders/{folder}/documents/{document}`, the last bound parameter that
+implements `HasValidators` is used. A URI names its parents first, so that is the resource the
+request is about: the document's ETag is sent, and `If-Match` is checked against the document and
+never the folder.
+
 `HasModelValidators` gives a strong ETag from the model's class, key and `updated_at`, and
 `Last-Modified` from `updated_at`. Section 8.8.1 says a strong tag must change whenever the
 representation does, and that holds only while every change touches `updated_at` and two writes
@@ -627,6 +632,13 @@ keys last. Put your `ttl` in your API documentation.
 - **A replay is the stored response** with its original status, headers and body, minus `Date`
   and cookies. With Negotiation on, it gets its own request ID and `traceparent`, because a retry
   is a new request. No header marks it as a replay: the draft defines none.
+- **Stored responses are encrypted.** A response can hold a secret, such as an API key shown once
+  when it is created, and a retry has to get it back. Each one is encrypted with AES-256-GCM under
+  a key derived (HKDF, RFC 5869) from the application key and the client's `Idempotency-Key`, and
+  kept under a hash of that key. Reading the cache, or even the cache and `APP_KEY` together,
+  does not reveal it: that takes the `Idempotency-Key`, which only the client has. Keep a rotated
+  application key in `APP_PREVIOUS_KEYS` until the TTL has passed, or stored responses are
+  forgotten and retries run again.
 - **The cache store has to support atomic locks**, which is how a concurrent retry is told apart
   from a completed one. Redis, Memcached, database, file, DynamoDB and array do. APC, session and
   storage stores do not, and nor does the null store in practice, since it keeps nothing. The
@@ -1231,6 +1243,10 @@ type.
   is for `multipart/form-data`: PHP parses it into fields and files and leaves `php://input` empty.
 - Types match on type and subtype, case-insensitively. `consumes:application/json` accepts
   `application/json; charset=utf-8`, and does not accept `application/merge-patch+json`; list it.
+- **The last declaration wins.** A route that declares `consumes` overrides one from its group, and
+  a controller's overrides the route's. Put `consumes:application/json` on a whole API group, and
+  a PATCH route can declare `consumes:application/merge-patch+json` without lifting the group's
+  first. A declaration removed with `withoutMiddleware()` does not count.
 
 ### Trace context
 

@@ -8,6 +8,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use JustSteveKing\Toolbox\Tests\Fixtures\Models\Document;
+use JustSteveKing\Toolbox\Tests\Fixtures\Models\Folder;
 
 beforeEach(function (): void {
     Schema::create('documents', function (Blueprint $table): void {
@@ -16,12 +17,27 @@ beforeEach(function (): void {
         $table->timestamps();
     });
 
+    Schema::create('folders', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->timestamps();
+    });
+
+    $this->folder = Folder::query()->create(['name' => 'Contracts']);
+    $this->folder->forceFill(['updated_at' => '2026-10-01 09:00:00'])->saveQuietly();
+
     $this->document = Document::query()->create(['title' => 'Draft']);
     $this->document->forceFill(['updated_at' => '2026-10-15 09:00:00'])->saveQuietly();
 
     Route::middleware([SubstituteBindings::class, 'conditional'])->group(function (): void {
         Route::get('api/documents/{document}', fn (Document $document) => ['title' => $document->title]);
         Route::patch('api/documents/{document}', function (Request $request, Document $document) {
+            $document->update(['title' => $request->string('title')->toString()]);
+
+            return ['title' => $document->title];
+        });
+        Route::get('api/folders/{folder}/documents/{document}', fn (Folder $folder, Document $document) => ['title' => $document->title]);
+        Route::patch('api/folders/{folder}/documents/{document}', function (Request $request, Folder $folder, Document $document) {
             $document->update(['title' => $request->string('title')->toString()]);
 
             return ['title' => $document->title];
@@ -170,5 +186,25 @@ describe('caching directives through Laravel\'s cache.headers', function (): voi
             ->assertOk()
             ->assertETag(currentTag())
             ->assertCacheControl(['public', 'max-age' => 60, 'stale-while-revalidate' => 30, 'stale-if-error' => 86400, 'immutable']);
+    });
+});
+
+describe('nested routes', function (): void {
+    it('takes validators from the resource the URI names, not its parent', function (): void {
+        $this->get('api/folders/1/documents/1')
+            ->assertOk()
+            ->assertETag(currentTag(), weak: false)
+            ->assertHeader('Last-Modified', 'Thu, 15 Oct 2026 09:00:00 GMT');
+    });
+
+    it('checks If-Match against the nested resource', function (): void {
+        $this->patch('api/folders/1/documents/1', ['title' => 'Final'], ['If-Match' => currentTag()])->assertOk();
+    });
+
+    it('refuses an If-Match that only matches the parent', function (): void {
+        $this->patch('api/folders/1/documents/1', ['title' => 'Final'], ['If-Match' => $this->folder->entityTag()->toString()])
+            ->assertPreconditionFailed();
+
+        expect(Document::query()->firstOrFail()->title)->toBe('Draft');
     });
 });

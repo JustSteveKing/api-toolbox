@@ -88,6 +88,39 @@ describe('415 Unsupported Media Type', function (): void {
             ->assertJsonPath('detail', 'The request has content but no Content-Type. Supported content types: application/json.');
     });
 
+    it('lets a route declaration override its group', function (): void {
+        Route::middleware('consumes:application/json')->group(function (): void {
+            Route::post('api/documents', fn () => ['ok' => true]);
+            Route::patch('api/documents/1', fn () => ['ok' => true])->middleware('consumes:application/merge-patch+json');
+        });
+
+        $patch = fn (string $type) => $this->call('PATCH', 'api/documents/1', [], [], [], ['CONTENT_TYPE' => $type, 'HTTP_ACCEPT' => 'application/json'], '{"a":1}');
+
+        $patch('application/merge-patch+json')->assertOk();
+        $patch('application/json')->assertStatus(415)->assertHeader('Accept', 'application/merge-patch+json');
+
+        $this->call('POST', 'api/documents', [], [], [], ['CONTENT_TYPE' => 'application/merge-patch+json', 'HTTP_ACCEPT' => 'application/json'], '{"a":1}')
+            ->assertStatus(415);
+    });
+
+    it('lets a controller declaration override the route', function (): void {
+        Route::patch('api/documents/2', ConsumesMergePatchController::class)->middleware('consumes:application/json');
+
+        $this->call('PATCH', 'api/documents/2', [], [], [], ['CONTENT_TYPE' => 'application/merge-patch+json', 'HTTP_ACCEPT' => 'application/json'], '{"a":1}')
+            ->assertOk();
+    });
+
+    it('applies the group declaration when the route excludes its own', function (): void {
+        Route::middleware('consumes:application/json')->group(function (): void {
+            Route::patch('api/documents/3', fn () => ['ok' => true])
+                ->middleware('consumes:application/merge-patch+json')
+                ->withoutMiddleware('consumes:application/merge-patch+json');
+        });
+
+        $this->call('PATCH', 'api/documents/3', [], [], [], ['CONTENT_TYPE' => 'application/merge-patch+json', 'HTTP_ACCEPT' => 'application/json'], '{"a":1}')
+            ->assertStatus(415);
+    });
+
     it('adds Accept-Patch to a refused PATCH (RFC 5789 section 2.2)', function (): void {
         $this->call('PATCH', 'api/leads/1', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], '{"a":1}')
             ->assertStatus(415)
@@ -189,3 +222,16 @@ describe('trace context', function (): void {
         Http::assertSent(fn (ClientRequest $request) => $request->header('traceparent') === ['00-11111111111111111111111111111111-2222222222222222-01']);
     });
 });
+
+final class ConsumesMergePatchController implements Illuminate\Routing\Controllers\HasMiddleware
+{
+    public static function middleware(): array
+    {
+        return ['consumes:application/merge-patch+json'];
+    }
+
+    public function __invoke(): array
+    {
+        return ['ok' => true];
+    }
+}

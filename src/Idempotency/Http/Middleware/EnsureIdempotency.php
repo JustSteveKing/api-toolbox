@@ -53,14 +53,14 @@ final readonly class EnsureIdempotency
 
         $key = IdempotencyKey::parse($field) ?? throw InvalidIdempotencyKey::malformed($this->documentation);
 
-        $storageKey = $this->storageKey($request, $key);
+        $scope = $this->scope($request);
         $fingerprint = $this->fingerprint($request);
 
-        if (($stored = $this->store->get($storageKey)) !== null) {
+        if (($stored = $this->store->get($scope, $key)) !== null) {
             return $this->replay($stored, $fingerprint);
         }
 
-        $lock = $this->store->lock($storageKey);
+        $lock = $this->store->lock($scope, $key);
 
         if (! $lock->get()) {
             throw IdempotencyKeyConflict::inFlight($this->retryAfter);
@@ -68,7 +68,7 @@ final readonly class EnsureIdempotency
 
         try {
             // The original may have finished between the first look and taking the lock.
-            if (($stored = $this->store->get($storageKey)) !== null) {
+            if (($stored = $this->store->get($scope, $key)) !== null) {
                 return $this->replay($stored, $fingerprint);
             }
 
@@ -77,7 +77,7 @@ final readonly class EnsureIdempotency
             $captured = $this->shouldStore($response) ? StoredResponse::capture($fingerprint, $response) : null;
 
             if ($captured !== null) {
-                $this->store->put($storageKey, $captured);
+                $this->store->put($scope, $key, $captured);
             }
 
             return $response;
@@ -104,12 +104,11 @@ final readonly class EnsureIdempotency
      * or the client address when there is none, so two clients that pick the same key do not
      * collide.
      */
-    private function storageKey(Request $request, IdempotencyKey $key): string
+    private function scope(Request $request): string
     {
         $identifier = $request->user()?->getAuthIdentifier();
-        $scope = is_scalar($identifier) ? 'user:'.$identifier : 'ip:'.$request->ip();
 
-        return hash('sha256', $scope."\n".$key->value);
+        return is_scalar($identifier) ? 'user:'.$identifier : 'ip:'.$request->ip();
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Auth\GenericUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use JustSteveKing\Toolbox\Idempotency\IdempotencyKey;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyStore;
 
 beforeEach(function (): void {
@@ -90,9 +91,8 @@ it('treats the same key on another endpoint as a different request', function ()
 });
 
 it('answers a retry while the original is in flight with 409, Retry-After and the apiguide.dev type', function (): void {
-    // Hold the lock the original request would hold. The storage key is the user or client
-    // address, then the key, hashed, as the middleware builds it.
-    $lock = app(IdempotencyStore::class)->lock(hash('sha256', "ip:127.0.0.1\nabc"));
+    // Hold the lock the original request would hold, scoped to the client address.
+    $lock = app(IdempotencyStore::class)->lock('ip:127.0.0.1', IdempotencyKey::parse('"abc"'));
     $lock->get();
 
     charge($this, '"abc"')
