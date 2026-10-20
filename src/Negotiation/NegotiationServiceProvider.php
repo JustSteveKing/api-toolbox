@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Negotiation;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel as KernelContract;
 use Illuminate\Foundation\Http\Kernel;
@@ -71,11 +72,11 @@ final class NegotiationServiceProvider extends ServiceProvider
         });
 
         if ($tracing && ($options['propagate_trace'] ?? true) === true) {
-            $app = $this->app;
-
-            $this->callAfterResolving(HttpClient::class, static function (HttpClient $http) use ($app): void {
-                $http->globalRequestMiddleware(static function (RequestInterface $request) use ($app): RequestInterface {
-                    $current = $app->make(CurrentTrace::class);
+            $this->callAfterResolving(HttpClient::class, static function (HttpClient $http): void {
+                $http->globalRequestMiddleware(static function (RequestInterface $request): RequestInterface {
+                    // Resolved from the current container, not the one that booted: Octane serves
+                    // each request from a sandbox, and the trace is scoped to it.
+                    $current = Container::getInstance()->make(CurrentTrace::class);
 
                     // Something else, such as an OpenTelemetry instrumentation, may have set it.
                     if ($current->context === null || $request->hasHeader('traceparent')) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\ProblemDetails;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -97,13 +98,15 @@ final class ProblemDetailsServiceProvider extends ServiceProvider
             });
         }
 
-        $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
+        $this->callAfterResolving(ExceptionHandler::class, static function (ExceptionHandler $handler): void {
             if (! $handler instanceof Handler) {
                 return;
             }
 
+            // Resolved from the current container, not the one that booted: Octane serves each
+            // request from a sandbox, and the request ID that becomes "instance" is scoped to it.
             $handler->renderable(
-                fn (Throwable $e, Request $request): ?JsonResponse => $this->app->make(ProblemRenderer::class)->render($e, $request),
+                static fn (Throwable $e, Request $request): ?JsonResponse => Container::getInstance()->make(ProblemRenderer::class)->render($e, $request),
             );
         });
     }
