@@ -1236,6 +1236,10 @@ type.
   is for `multipart/form-data`: PHP parses it into fields and files and leaves `php://input` empty.
 - Types match on type and subtype, case-insensitively. `consumes:application/json` accepts
   `application/json; charset=utf-8`, and does not accept `application/merge-patch+json`; list it.
+- **The last declaration wins.** A route that declares `consumes` overrides one from its group, and
+  a controller's overrides the route's. Put `consumes:application/json` on a whole API group, and
+  a PATCH route can declare `consumes:application/merge-patch+json` without lifting the group's
+  first. A declaration removed with `withoutMiddleware()` does not count.
 
 ### Trace context
 
