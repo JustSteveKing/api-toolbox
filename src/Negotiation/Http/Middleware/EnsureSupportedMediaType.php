@@ -25,7 +25,7 @@ final readonly class EnsureSupportedMediaType
 {
     public function handle(Request $request, Closure $next, string ...$consumes): Response
     {
-        if ($request->getContent() !== '') {
+        if (self::hasContent($request)) {
             $supported = array_map(
                 static fn (string $type): MediaType => MediaType::parse($type) ?? throw new InvalidArgumentException("[{$type}] is not a media type."),
                 $consumes,
@@ -53,5 +53,16 @@ final readonly class EnsureSupportedMediaType
         }
 
         return $response;
+    }
+
+    /**
+     * The raw body is not enough on its own: PHP parses multipart/form-data into fields and files
+     * and leaves php://input empty, so a multipart upload has content only in the parameter bags.
+     */
+    private static function hasContent(Request $request): bool
+    {
+        return $request->getContent() !== ''
+            || $request->request->count() > 0
+            || $request->files->count() > 0;
     }
 }

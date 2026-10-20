@@ -1227,6 +1227,8 @@ type.
   a refused PATCH also carries `Accept-Patch`, which RFC 5789 section 2.2 says it SHOULD.
 - A request with no content is never refused. One with content and no `Content-Type` is: section
   8.3 lets a server guess, and a guess is not a type the route said it consumes.
+- Form fields and uploaded files count as content even when the raw body is empty, which it always
+  is for `multipart/form-data`: PHP parses it into fields and files and leaves `php://input` empty.
 - Types match on type and subtype, case-insensitively. `consumes:application/json` accepts
   `application/json; charset=utf-8`, and does not accept `application/merge-patch+json`; list it.
 
