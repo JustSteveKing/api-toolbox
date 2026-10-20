@@ -49,6 +49,8 @@ abstract class TestCase extends Orchestra
     {
         parent::resolveApplicationConfiguration($app);
 
+        // Every Laravel application has one, and idempotency encrypts what it stores with it.
+        $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set(Features::CONFIG_KEY.'.features', $this->features());
     }
 }

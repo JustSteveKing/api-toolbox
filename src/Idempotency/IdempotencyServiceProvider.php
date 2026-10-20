@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Cache\Factory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel as KernelContract;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +31,7 @@ final class IdempotencyServiceProvider extends ServiceProvider
                 $app->make(Factory::class)->store(is_string($store) ? $store : null),
                 self::integer($options['ttl'] ?? null, self::DEFAULT_TTL),
                 self::integer($options['lock'] ?? null, 60),
+                array_values($app->make(Encrypter::class)->getAllKeys()),
             );
         });
 

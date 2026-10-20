@@ -632,6 +632,13 @@ keys last. Put your `ttl` in your API documentation.
 - **A replay is the stored response** with its original status, headers and body, minus `Date`
   and cookies. With Negotiation on, it gets its own request ID and `traceparent`, because a retry
   is a new request. No header marks it as a replay: the draft defines none.
+- **Stored responses are encrypted.** A response can hold a secret, such as an API key shown once
+  when it is created, and a retry has to get it back. Each one is encrypted with AES-256-GCM under
+  a key derived (HKDF, RFC 5869) from the application key and the client's `Idempotency-Key`, and
+  kept under a hash of that key. Reading the cache, or even the cache and `APP_KEY` together,
+  does not reveal it: that takes the `Idempotency-Key`, which only the client has. Keep a rotated
+  application key in `APP_PREVIOUS_KEYS` until the TTL has passed, or stored responses are
+  forgotten and retries run again.
 - **The cache store has to support atomic locks**, which is how a concurrent retry is told apart
   from a completed one. Redis, Memcached, database, file, DynamoDB and array do. APC, session and
   storage stores do not, and nor does the null store in practice, since it keeps nothing. The

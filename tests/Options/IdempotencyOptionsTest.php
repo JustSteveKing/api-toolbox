@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use JustSteveKing\Toolbox\Idempotency\IdempotencyKey;
 use JustSteveKing\Toolbox\Idempotency\IdempotencyStore;
 
 beforeEach(function (): void {
@@ -23,7 +24,7 @@ it('keeps responses for the configured TTL', function (): void {
 });
 
 it('sends the configured Retry-After while a request is in flight', function (): void {
-    $lock = app(IdempotencyStore::class)->lock(hash('sha256', "ip:127.0.0.1\nabc"));
+    $lock = app(IdempotencyStore::class)->lock('ip:127.0.0.1', IdempotencyKey::parse('"abc"'));
     $lock->get();
 
     $this->postJson('v1/strict', [], ['Idempotency-Key' => '"abc"'])->assertStatus(409)->assertHeader('Retry-After', '5');
