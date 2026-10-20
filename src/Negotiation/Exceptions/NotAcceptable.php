@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Negotiation\Exceptions;
 
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
 
 /**
@@ -18,7 +19,7 @@ final class NotAcceptable extends NotAcceptableHttpException
     public function __construct(array $available)
     {
         parent::__construct(
-            'This endpoint can only produce '.implode(', ', $available).', which does not match the Accept header.',
+            Messages::get('negotiation.not_acceptable', ['types' => implode(', ', $available)]),
             headers: ['Vary' => 'Accept'],
         );
     }

@@ -6,6 +6,7 @@ namespace JustSteveKing\Toolbox\Idempotency\Exceptions;
 
 use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\Support\ApiGuide;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -21,7 +22,7 @@ final class IdempotencyKeyConflict extends HttpException implements HasProblemTy
     {
         return new self(
             422,
-            'This Idempotency-Key was already used with a different request payload. Resend the original payload, or use a new key for a new request.',
+            Messages::get('idempotency.conflict'),
         );
     }
 
@@ -29,7 +30,7 @@ final class IdempotencyKeyConflict extends HttpException implements HasProblemTy
     {
         return new self(
             409,
-            'A request with this Idempotency-Key is still being processed. Retry the same request after it completes.',
+            Messages::get('idempotency.in_flight'),
             headers: ['Retry-After' => (string) $retryAfter],
         );
     }

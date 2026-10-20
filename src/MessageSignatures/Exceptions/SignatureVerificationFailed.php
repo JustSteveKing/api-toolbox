@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\MessageSignatures\Exceptions;
 
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -17,7 +18,7 @@ final class SignatureVerificationFailed extends HttpException
 {
     public function __construct(string $reason, string $acceptSignature)
     {
-        parent::__construct(401, "The request's signature could not be verified: {$reason}", headers: [
+        parent::__construct(401, Messages::get('message_signatures.verification_failed', ['reason' => $reason]), headers: [
             'Accept-Signature' => $acceptSignature,
         ]);
     }

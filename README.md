@@ -319,6 +319,30 @@ domain-specific formats.
 Your own render callbacks in `withExceptions()` run first, so an application can always
 override what this package renders.
 
+### Translating details
+
+Every `detail` this package writes itself, such as an idempotency conflict, a 415 or a failed
+signature, comes from `resources/lang/en/problems.php` and is read in the application's locale.
+To translate them, publish the file and add a locale beside it:
+
+```bash
+php artisan vendor:publish --tag=api-toolbox-lang
+```
+
+```php
+// lang/vendor/api-toolbox/es/problems.php
+return [
+    'idempotency' => [
+        'conflict' => 'Esta Idempotency-Key ya se usó con otro cuerpo de solicitud.',
+    ],
+];
+```
+
+A line missing from a locale falls back to English. The `type` and `title` do not change with the
+language: section 3.1.3 lets a title be localized, but clients branch on the type, so it is kept
+the same everywhere. Set the locale before the request reaches the toolbox's middleware, for
+example from `Accept-Language` in middleware that runs first.
+
 ## Deprecation and Sunset
 
 [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) (Deprecation),

@@ -6,6 +6,7 @@ namespace JustSteveKing\Toolbox\MergePatch\Exceptions;
 
 use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\Support\ApiGuide;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
@@ -16,7 +17,7 @@ final class MalformedMergePatch extends BadRequestHttpException implements HasPr
 {
     public function __construct(string $reason)
     {
-        parent::__construct("The merge patch could not be parsed as JSON: {$reason}.");
+        parent::__construct(Messages::get('merge_patch.malformed', ['reason' => $reason]));
     }
 
     public function problemType(): string

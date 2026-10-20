@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JustSteveKing\Toolbox\Idempotency\Exceptions;
 
 use JustSteveKing\Toolbox\Support\Link;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
@@ -17,7 +18,7 @@ final class InvalidIdempotencyKey extends BadRequestHttpException
     public static function missing(?string $documentation): self
     {
         return new self(
-            'This operation requires an Idempotency-Key header.',
+            Messages::get('idempotency.missing'),
             headers: self::describedBy($documentation),
         );
     }
@@ -25,7 +26,7 @@ final class InvalidIdempotencyKey extends BadRequestHttpException
     public static function malformed(?string $documentation): self
     {
         return new self(
-            'The Idempotency-Key header must be a string of 1 to 255 visible ASCII characters, such as "8e03978e-40d5-43e8-bc93-6894a57f9324".',
+            Messages::get('idempotency.malformed'),
             headers: self::describedBy($documentation),
         );
     }

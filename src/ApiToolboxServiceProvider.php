@@ -22,6 +22,7 @@ use JustSteveKing\Toolbox\Pagination\PaginationServiceProvider;
 use JustSteveKing\Toolbox\Preferences\PreferencesServiceProvider;
 use JustSteveKing\Toolbox\ProblemDetails\ProblemDetailsServiceProvider;
 use JustSteveKing\Toolbox\RateLimitHeaders\RateLimitHeadersServiceProvider;
+use JustSteveKing\Toolbox\Support\Messages;
 use JustSteveKing\Toolbox\Testing\TestingServiceProvider;
 
 /**
@@ -98,10 +99,16 @@ final class ApiToolboxServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadTranslationsFrom(Messages::PATH, Messages::NAMESPACE);
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../stubs/api-toolbox.php' => $this->app->configPath(Features::CONFIG_KEY.'.php'),
             ], Features::CONFIG_KEY.'-config');
+
+            $this->publishes([
+                Messages::PATH => $this->app->langPath('vendor/'.Messages::NAMESPACE),
+            ], Features::CONFIG_KEY.'-lang');
 
             self::about($this->app->make(EnabledFeatures::class));
         }

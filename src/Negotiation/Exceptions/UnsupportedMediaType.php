@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Negotiation\Exceptions;
 
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
 
 /**
@@ -22,8 +23,8 @@ final class UnsupportedMediaType extends UnsupportedMediaTypeHttpException
 
         parent::__construct(
             $received === null
-                ? "The request has content but no Content-Type. Supported content types: {$list}."
-                : "The Content-Type '{$received}' is not supported. Supported content types: {$list}.",
+                ? Messages::get('negotiation.missing_content_type', ['types' => $list])
+                : Messages::get('negotiation.unsupported_media_type', ['type' => $received, 'types' => $list]),
             headers: array_filter([
                 'Accept' => $list,
                 'Accept-Patch' => $patch ? $list : null,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\ConditionalRequests\Exceptions;
 
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -18,7 +19,7 @@ final class PreconditionRequired extends HttpException
     {
         parent::__construct(
             428,
-            'This request must be conditional. Fetch the resource, then retry with its ETag in If-Match.',
+            Messages::get('conditional_requests.precondition_required'),
             headers: ['Cache-Control' => 'no-store'],
         );
     }
