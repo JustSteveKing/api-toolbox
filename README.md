@@ -319,6 +319,30 @@ domain-specific formats.
 Your own render callbacks in `withExceptions()` run first, so an application can always
 override what this package renders.
 
+### Translating details
+
+Every `detail` this package writes itself, such as an idempotency conflict, a 415 or a failed
+signature, comes from `resources/lang/en/problems.php` and is read in the application's locale.
+To translate them, publish the file and add a locale beside it:
+
+```bash
+php artisan vendor:publish --tag=api-toolbox-lang
+```
+
+```php
+// lang/vendor/api-toolbox/es/problems.php
+return [
+    'idempotency' => [
+        'conflict' => 'Esta Idempotency-Key ya se usó con otro cuerpo de solicitud.',
+    ],
+];
+```
+
+A line missing from a locale falls back to English. The `type` and `title` do not change with the
+language: section 3.1.3 lets a title be localized, but clients branch on the type, so it is kept
+the same everywhere. Set the locale before the request reaches the toolbox's middleware, for
+example from `Accept-Language` in middleware that runs first.
+
 ## Deprecation and Sunset
 
 [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) (Deprecation),
@@ -1203,6 +1227,8 @@ type.
   a refused PATCH also carries `Accept-Patch`, which RFC 5789 section 2.2 says it SHOULD.
 - A request with no content is never refused. One with content and no `Content-Type` is: section
   8.3 lets a server guess, and a guess is not a type the route said it consumes.
+- Form fields and uploaded files count as content even when the raw body is empty, which it always
+  is for `multipart/form-data`: PHP parses it into fields and files and leaves `php://input` empty.
 - Types match on type and subtype, case-insensitively. `consumes:application/json` accepts
   `application/json; charset=utf-8`, and does not accept `application/merge-patch+json`; list it.
 

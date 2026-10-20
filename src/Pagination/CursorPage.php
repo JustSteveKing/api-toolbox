@@ -19,11 +19,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     Link: <https://api.example.com/posts>; rel="first"
  *
  *     [{"id": 1, ...}, {"id": 2, ...}]
+ *
+ * Generic over the paginator's types rather than taking CursorPaginator<array-key, mixed>, which
+ * the paginator Eloquent's cursorPaginate() returns, CursorPaginator<int, Model>, does not satisfy.
+ *
+ * @template TKey of array-key
+ * @template TValue
  */
 final readonly class CursorPage implements Responsable
 {
     /**
-     * @param  CursorPaginator<array-key, mixed>  $paginator
+     * @param  CursorPaginator<TKey, TValue>  $paginator
      * @param  class-string<JsonResource>|null  $resource
      */
     public function __construct(
@@ -32,8 +38,12 @@ final readonly class CursorPage implements Responsable
     ) {}
 
     /**
-     * @param  CursorPaginator<array-key, mixed>  $paginator
+     * @template TPageKey of array-key
+     * @template TPageValue
+     *
+     * @param  CursorPaginator<TPageKey, TPageValue>  $paginator
      * @param  class-string<JsonResource>|null  $resource
+     * @return self<TPageKey, TPageValue>
      */
     public static function of(CursorPaginator $paginator, ?string $resource = null): self
     {

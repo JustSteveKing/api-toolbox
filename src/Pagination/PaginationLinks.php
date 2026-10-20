@@ -16,7 +16,10 @@ use JustSteveKing\Toolbox\Support\Link;
 final class PaginationLinks
 {
     /**
-     * @param  CursorPaginator<array-key, mixed>  $paginator
+     * @template TKey of array-key
+     * @template TValue
+     *
+     * @param  CursorPaginator<TKey, TValue>  $paginator
      * @return list<Link>
      */
     public static function for(CursorPaginator $paginator): array

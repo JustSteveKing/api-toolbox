@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +59,26 @@ describe('415 Unsupported Media Type', function (): void {
             ->assertHeaderMissing('Accept-Patch')
             ->assertProblemType('https://apiguide.dev/errors/unsupported-media-type', 415)
             ->assertJsonPath('detail', "The Content-Type 'application/xml' is not supported. Supported content types: application/json.");
+    });
+
+    it('refuses form fields that arrive without a raw body', function (): void {
+        // PHP parses multipart/form-data into fields and files and leaves php://input empty, so
+        // the content is all in the parameter bags.
+        $this->call('POST', 'api/leads', ['name' => 'Ada'], [], [], ['CONTENT_TYPE' => 'multipart/form-data; boundary=----toolbox', 'HTTP_ACCEPT' => 'application/json'])
+            ->assertProblemType('https://apiguide.dev/errors/unsupported-media-type', 415)
+            ->assertJsonPath('detail', "The Content-Type 'multipart/form-data; boundary=----toolbox' is not supported. Supported content types: application/json.");
+    });
+
+    it('refuses an uploaded file sent to a JSON route', function (): void {
+        $this->call('POST', 'api/leads', [], [], ['import' => UploadedFile::fake()->create('leads.csv', 1)], ['CONTENT_TYPE' => 'multipart/form-data; boundary=----toolbox', 'HTTP_ACCEPT' => 'application/json'])
+            ->assertProblem(415);
+    });
+
+    it('accepts form fields on a route that consumes them', function (): void {
+        Route::post('api/uploads', fn () => ['ok' => true])->middleware('consumes:multipart/form-data');
+
+        $this->call('POST', 'api/uploads', ['name' => 'Ada'], [], ['import' => UploadedFile::fake()->create('leads.csv', 1)], ['CONTENT_TYPE' => 'multipart/form-data; boundary=----toolbox', 'HTTP_ACCEPT' => 'application/json'])
+            ->assertOk();
     });
 
     it('refuses content without a Content-Type', function (): void {

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use JustSteveKing\Toolbox\Digest\DigestField;
 use JustSteveKing\Toolbox\Digest\Exceptions\DigestProblem;
 use JustSteveKing\Toolbox\Support\DigestAlgorithm;
+use JustSteveKing\Toolbox\Support\Messages;
 use JustSteveKing\Toolbox\Support\StructuredFields\ByteSequence;
 use JustSteveKing\Toolbox\Support\StructuredFields\Item;
 use JustSteveKing\Toolbox\Support\StructuredFields\Serializer;
@@ -39,7 +40,7 @@ final readonly class VerifyDigests
         $present = array_values(array_filter(self::FIELDS, static fn (string $field): bool => $request->headers->has($field)));
 
         if ($present === [] && in_array('required', $options, true)) {
-            throw new BadRequestHttpException('This request needs a Content-Digest or Repr-Digest field.', headers: [
+            throw new BadRequestHttpException(Messages::get('digest.missing'), headers: [
                 'Want-Content-Digest' => 'sha-256=10, sha-512=10',
             ]);
         }
@@ -64,7 +65,7 @@ final readonly class VerifyDigests
         // The draft's invalid-values type is for values that parse but cannot be digests, so a
         // field that is not a Dictionary at all is a plain 400.
         if ($members === null) {
-            throw new BadRequestHttpException("{$field} is not a Structured Field Dictionary (RFC 9651, section 3.2).");
+            throw new BadRequestHttpException(Messages::get('digest.not_a_dictionary', ['field' => $field]));
         }
 
         $content = $request->getContent();

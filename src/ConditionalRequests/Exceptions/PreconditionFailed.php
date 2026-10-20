@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JustSteveKing\Toolbox\ConditionalRequests\Exceptions;
 
 use JustSteveKing\Toolbox\ConditionalRequests\EntityTag;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -19,7 +20,7 @@ final class PreconditionFailed extends HttpException
     {
         parent::__construct(
             412,
-            'The resource has changed since you last fetched it. Fetch it again and retry with its current ETag.',
+            Messages::get('conditional_requests.precondition_failed'),
             headers: $current === null ? [] : ['ETag' => $current->toString()],
         );
     }

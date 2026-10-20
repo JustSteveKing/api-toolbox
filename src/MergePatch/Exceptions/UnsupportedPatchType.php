@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JustSteveKing\Toolbox\MergePatch\Exceptions;
 
 use JustSteveKing\Toolbox\MergePatch\MergePatch;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
 
 /**
@@ -17,8 +18,8 @@ final class UnsupportedPatchType extends UnsupportedMediaTypeHttpException
     {
         parent::__construct(
             $received === null
-                ? 'A PATCH needs a Content-Type of '.MergePatch::MEDIA_TYPE.'.'
-                : "The patch format '{$received}' is not supported. Send ".MergePatch::MEDIA_TYPE.'.',
+                ? Messages::get('merge_patch.missing_content_type', ['type' => MergePatch::MEDIA_TYPE])
+                : Messages::get('merge_patch.unsupported_type', ['received' => $received, 'type' => MergePatch::MEDIA_TYPE]),
             headers: ['Accept-Patch' => MergePatch::MEDIA_TYPE],
         );
     }

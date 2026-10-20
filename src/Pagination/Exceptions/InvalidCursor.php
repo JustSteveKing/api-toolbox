@@ -6,6 +6,7 @@ namespace JustSteveKing\Toolbox\Pagination\Exceptions;
 
 use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\Support\ApiGuide;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
@@ -16,7 +17,7 @@ final class InvalidCursor extends BadRequestHttpException implements HasProblemT
 {
     public function __construct(string $parameter)
     {
-        parent::__construct("The {$parameter} parameter could not be decoded.");
+        parent::__construct(Messages::get('pagination.invalid_cursor', ['parameter' => $parameter]));
     }
 
     public function problemType(): string

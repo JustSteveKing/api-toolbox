@@ -13,6 +13,7 @@ use JustSteveKing\Toolbox\MessageSignatures\Exceptions\MalformedSignature;
 use JustSteveKing\Toolbox\MessageSignatures\Exceptions\SignatureBaseException;
 use JustSteveKing\Toolbox\MessageSignatures\Exceptions\SignatureVerificationFailed;
 use JustSteveKing\Toolbox\Support\DigestAlgorithm;
+use JustSteveKing\Toolbox\Support\Messages;
 use JustSteveKing\Toolbox\Support\StructuredFields\ByteSequence;
 use JustSteveKing\Toolbox\Support\StructuredFields\InnerList;
 use JustSteveKing\Toolbox\Support\StructuredFields\Item;
@@ -46,10 +47,10 @@ final readonly class Verifier
         [$inputs, $signatures] = $this->fields($message);
 
         if ($inputs === []) {
-            throw $this->fail('the request is not signed.', $content);
+            throw $this->fail(self::reason('not_signed'), $content);
         }
 
-        $reason = 'no signature uses a known key.';
+        $reason = self::reason('unknown_key');
 
         foreach ($inputs as $label => $parameters) {
             $signature = $signatures[$label] ?? null;
@@ -93,40 +94,40 @@ final readonly class Verifier
         $alg = $parameters->parameters['alg'] ?? null;
 
         if ($alg !== null && $alg !== $key->algorithm) {
-            return 'the alg parameter does not match the key.';
+            return self::reason('algorithm_mismatch');
         }
 
         $covered = array_map(Components::key(...), $parameters->items);
 
         foreach ($this->required($content) as $component) {
             if (! in_array(Components::key($component), $covered, true)) {
-                return "the signature does not cover {$component}.";
+                return self::reason('not_covered', ['component' => $component]);
             }
         }
 
         if ($this->policy->tag !== null && ($parameters->parameters['tag'] ?? null) !== $this->policy->tag) {
-            return 'the signature does not carry the required tag.';
+            return self::reason('missing_tag');
         }
 
         if ($this->policy->requireNonce && ! is_string($parameters->parameters['nonce'] ?? null)) {
-            return 'the signature has no nonce.';
+            return self::reason('missing_nonce');
         }
 
         try {
             $base = SignatureBase::create($message, $parameters);
             $valid = Algorithms::named($key->algorithm)->verify($base, $bytes, $key);
         } catch (SignatureBaseException|KeyException) {
-            return 'a covered component could not be resolved.';
+            return self::reason('unresolvable_component');
         }
 
         if (! $valid) {
-            return 'the signature does not match.';
+            return self::reason('mismatch');
         }
 
         // A signature over content-digest proves only that the field was not changed. The digest
         // has to match the content actually received too, or the content is not covered at all.
         if (in_array(Components::key('content-digest'), $covered, true) && ! $this->digestMatches($message, $content)) {
-            return 'Content-Digest does not match the content.';
+            return self::reason('content_digest_mismatch');
         }
 
         return $this->age($parameters);
@@ -139,19 +140,19 @@ final readonly class Verifier
         $expires = $parameters->parameters['expires'] ?? null;
 
         if (! is_int($created)) {
-            return 'the signature has no created time.';
+            return self::reason('missing_created');
         }
 
         if ($created > $now + $this->policy->leeway) {
-            return 'the signature was created in the future.';
+            return self::reason('created_in_future');
         }
 
         if ($now - $created > $this->policy->maxAge) {
-            return 'the signature is too old.';
+            return self::reason('too_old');
         }
 
         if (is_int($expires) && $now > $expires) {
-            return 'the signature has expired.';
+            return self::reason('expired');
         }
 
         return null;
@@ -209,7 +210,7 @@ final readonly class Verifier
                 Parser::dictionary($message->field('signature') ?? []),
             ];
         } catch (StructuredFieldException $e) {
-            throw new MalformedSignature("Signature or Signature-Input is not a valid Dictionary: {$e->getMessage()}");
+            throw new MalformedSignature(Messages::get('message_signatures.malformed', ['error' => $e->getMessage()]));
         }
     }
 
@@ -217,6 +218,14 @@ final readonly class Verifier
      * Section 5.1: in a response, Accept-Signature asks the client to sign its next request with
      * these components.
      */
+    /**
+     * @param  array<string, string>  $replace
+     */
+    private static function reason(string $key, array $replace = []): string
+    {
+        return Messages::get('message_signatures.reasons.'.$key, $replace);
+    }
+
     private function fail(string $reason, string $content): SignatureVerificationFailed
     {
         $parameters = ['created' => true];

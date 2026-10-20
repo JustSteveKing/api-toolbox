@@ -7,6 +7,7 @@ namespace JustSteveKing\Toolbox\Digest\Exceptions;
 use JustSteveKing\Toolbox\Contracts\HasProblemExtensions;
 use JustSteveKing\Toolbox\Contracts\HasProblemType;
 use JustSteveKing\Toolbox\Support\ApiGuide;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
@@ -49,7 +50,7 @@ final class DigestProblem extends BadRequestHttpException implements HasProblemE
         return new self(
             self::UNSUPPORTED_ALGORITHMS,
             ['unsupported_algorithms' => $unsupported],
-            'None of the hashing algorithms in the request is supported. Use sha-256 or sha-512.',
+            Messages::get('digest.unsupported_algorithms'),
             [
                 'Want-Content-Digest' => 'sha-256=10, sha-512=10',
                 'Want-Repr-Digest' => 'sha-256=10, sha-512=10',
@@ -64,7 +65,7 @@ final class DigestProblem extends BadRequestHttpException implements HasProblemE
      */
     public static function invalidValues(array $invalid): self
     {
-        return new self(self::INVALID_VALUES, ['invalid_digests' => $invalid], 'A digest in the request cannot have come from its hashing algorithm.');
+        return new self(self::INVALID_VALUES, ['invalid_digests' => $invalid], Messages::get('digest.invalid_values'));
     }
 
     /**
@@ -75,7 +76,7 @@ final class DigestProblem extends BadRequestHttpException implements HasProblemE
      */
     public static function mismatchedValues(array $mismatched): self
     {
-        return new self(self::MISMATCHED_VALUES, ['mismatched_digests' => $mismatched], 'A digest in the request does not match its content. It may have been changed in transit.');
+        return new self(self::MISMATCHED_VALUES, ['mismatched_digests' => $mismatched], Messages::get('digest.mismatched_values'));
     }
 
     public function problemType(): string

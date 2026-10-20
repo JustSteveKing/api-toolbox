@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use JustSteveKing\Toolbox\AsyncOperations\OperationStatus;
 use JustSteveKing\Toolbox\AsyncOperations\OperationStore;
+use JustSteveKing\Toolbox\Support\Messages;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -37,7 +38,7 @@ final readonly class ShowOperation
 
         // Someone else's operation is answered exactly as one that does not exist.
         if ($found === null || ($found->owner !== null && (! is_scalar($user) || (string) $user !== $found->owner))) {
-            throw new NotFoundHttpException('No operation with this ID is known.');
+            throw new NotFoundHttpException(Messages::get('async_operations.not_found'));
         }
 
         if ($found->status === OperationStatus::Succeeded && $found->location !== null) {
