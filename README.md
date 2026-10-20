@@ -480,6 +480,11 @@ final class Document extends Model implements HasValidators
 }
 ```
 
+On a nested route, such as `folders/{folder}/documents/{document}`, the last bound parameter that
+implements `HasValidators` is used. A URI names its parents first, so that is the resource the
+request is about: the document's ETag is sent, and `If-Match` is checked against the document and
+never the folder.
+
 `HasModelValidators` gives a strong ETag from the model's class, key and `updated_at`, and
 `Last-Modified` from `updated_at`. Section 8.8.1 says a strong tag must change whenever the
 representation does, and that holds only while every change touches `updated_at` and two writes

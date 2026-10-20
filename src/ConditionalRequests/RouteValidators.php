@@ -9,9 +9,11 @@ use Illuminate\Routing\Route;
 use JustSteveKing\Toolbox\ConditionalRequests\Contracts\HasValidators;
 
 /**
- * Finds the route-bound object that supplies a request's validators: the first route parameter
- * implementing HasValidators. Parameters are bound by SubstituteBindings, so the conditional
- * middleware is registered to run after it.
+ * Finds the route-bound object that supplies a request's validators: the last route parameter
+ * implementing HasValidators. On a nested route such as documents/{document}/comments/{comment}
+ * the URI names its parents first, so the last bound parameter is the resource the request is
+ * about. Parameters are bound by SubstituteBindings, so the conditional middleware is registered
+ * to run after it.
  */
 final class RouteValidators
 {
@@ -23,12 +25,14 @@ final class RouteValidators
             return null;
         }
 
+        $resource = null;
+
         foreach ($route->parameters() as $parameter) {
             if ($parameter instanceof HasValidators) {
-                return $parameter;
+                $resource = $parameter;
             }
         }
 
-        return null;
+        return $resource;
     }
 }
