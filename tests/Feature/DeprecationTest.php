@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use JustSteveKing\Toolbox\Deprecation\Contracts\DeprecationSource;
 use JustSteveKing\Toolbox\Deprecation\Notice;
 use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\CurrentController;
+use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\FilteredContactsController;
 use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\LegacyOrdersController;
 use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\MisconfiguredController;
 use JustSteveKing\Toolbox\Tests\Fixtures\Controllers\OffsetController;
@@ -118,4 +119,28 @@ it('does not send links twice when it is both global and on the route', function
     Route::get('api/orders', [LegacyOrdersController::class, 'index'])->middleware('deprecation');
 
     expect($this->get('api/orders')->headers->all('link'))->toHaveCount(2);
+});
+
+it('deprecates a query form of a route on its own, since its URI is a resource of its own', function (): void {
+    Route::get('api/contacts', [FilteredContactsController::class, 'index']);
+
+    $filtered = $this->get('api/contacts?organization_id=42')->assertOk();
+
+    expect($filtered->headers->get('Deprecation'))->toBe('@1793232000')
+        ->and($filtered->headers->get('Sunset'))->toBe('Sun, 31 Jan 2027 23:59:59 GMT')
+        ->and($filtered->headers->all('link'))->toBe(['<https://developer.example.com/filters>; rel="deprecation"']);
+
+    $plain = $this->get('api/contacts?search=ada')->assertOk();
+
+    expect($plain->headers->has('Deprecation'))->toBeFalse()
+        ->and($plain->headers->has('Sunset'))->toBeFalse()
+        ->and($plain->headers->has('Link'))->toBeFalse();
+});
+
+it('prefers a query form\'s notice to the route\'s own, and falls back to it without the query', function (): void {
+    Route::get('api/contacts/export', [FilteredContactsController::class, 'export']);
+
+    // The action's own Deprecation applies without the query; with it, the class's scoped one does.
+    expect($this->get('api/contacts/export')->headers->get('Deprecation'))->toBe('@1767225600')
+        ->and($this->get('api/contacts/export?organization_id=42')->headers->get('Deprecation'))->toBe('@1793232000');
 });
