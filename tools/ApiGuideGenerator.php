@@ -38,9 +38,18 @@ final class ApiGuideGenerator
         414 => 'uri-too-long',
         415 => 'unsupported-media-type',
         416 => 'range-not-satisfiable',
+        // RFC 9110 section 15.5.20.
+        421 => 'misdirected-request',
+        // RFC 4918, both.
+        423 => 'resource-locked',
+        424 => 'failed-dependency',
+        // RFC 8470.
+        425 => 'too-early',
         428 => 'precondition-required',
         429 => 'rate-limit-exceeded',
         431 => 'request-header-fields-too-large',
+        // RFC 7725.
+        451 => 'unavailable-for-legal-reasons',
         500 => 'internal-server-error',
         501 => 'not-implemented',
         502 => 'bad-gateway',
