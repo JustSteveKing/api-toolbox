@@ -58,6 +58,14 @@ final class AsyncOperationsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $options = $this->options();
+
+        // An application that registers the monitor itself, to document it with the rest of its
+        // API, turns this one off. Its route keeps the name Operations::ROUTE, which every 202's
+        // Location is built from.
+        if (($options['route'] ?? true) === false) {
+            return;
+        }
+
         $path = is_string($options['path'] ?? null) ? $options['path'] : self::DEFAULT_PATH;
         $middleware = is_array($options['middleware'] ?? null) ? array_values(array_filter($options['middleware'], is_string(...))) : ['api'];
 

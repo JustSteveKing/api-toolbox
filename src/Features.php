@@ -167,7 +167,7 @@ final class Features
      *
      * @see https://www.rfc-editor.org/rfc/rfc9110#section-15.3.3
      *
-     * @param  array{store?: string, ttl?: int, retry_after?: int, path?: string, middleware?: list<string>}  $options
+     * @param  array{store?: string, ttl?: int, retry_after?: int, path?: string, middleware?: list<string>, route?: bool}  $options
      */
     public static function asyncOperations(array $options = []): string
     {
