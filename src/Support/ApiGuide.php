@@ -29,6 +29,9 @@ final class ApiGuide
     public const string BAD_GATEWAY = self::BASE.'bad-gateway';
 
     /** 400 */
+    public const string DATE_NOT_ACCEPTABLE = self::BASE.'date-not-acceptable';
+
+    /** 400 */
     public const string DIGEST_INVALID_VALUES = self::BASE.'digest-invalid-values';
 
     /** 400 */
@@ -37,8 +40,17 @@ final class ApiGuide
     /** 400 */
     public const string DIGEST_UNSUPPORTED_ALGORITHMS = self::BASE.'digest-unsupported-algorithms';
 
+    /** 410 */
+    public const string ENDPOINT_SUNSET = self::BASE.'endpoint-sunset';
+
     /** 401 */
     public const string EXPIRED_AUTHENTICATION_TOKEN = self::BASE.'expired-authentication-token';
+
+    /** 424 */
+    public const string FAILED_DEPENDENCY = self::BASE.'failed-dependency';
+
+    /** 403 */
+    public const string FEATURE_DISABLED = self::BASE.'feature-disabled';
 
     /** 403 */
     public const string FORBIDDEN = self::BASE.'forbidden';
@@ -52,6 +64,9 @@ final class ApiGuide
     /** 422 */
     public const string IDEMPOTENCY_KEY_CONFLICT = self::BASE.'idempotency-key-conflict';
 
+    /** 400 */
+    public const string IDEMPOTENCY_KEY_MISSING = self::BASE.'idempotency-key-missing';
+
     /** 402 */
     public const string INSUFFICIENT_FUNDS = self::BASE.'insufficient-funds';
 
@@ -61,14 +76,23 @@ final class ApiGuide
     /** 500 */
     public const string INTERNAL_SERVER_ERROR = self::BASE.'internal-server-error';
 
+    /** 401 */
+    public const string INVALID_CREDENTIALS = self::BASE.'invalid-credentials';
+
     /** 400 */
     public const string INVALID_PAGINATION_CURSOR = self::BASE.'invalid-pagination-cursor';
 
     /** 400 */
     public const string INVALID_QUERY_PARAMETER = self::BASE.'invalid-query-parameter';
 
+    /** 401 */
+    public const string INVALID_SIGNATURE = self::BASE.'invalid-signature';
+
     /** 411 */
     public const string LENGTH_REQUIRED = self::BASE.'length-required';
+
+    /** 503 */
+    public const string MAINTENANCE_MODE = self::BASE.'maintenance-mode';
 
     /** 400 */
     public const string MALFORMED_REQUEST_BODY = self::BASE.'malformed-request-body';
@@ -76,11 +100,23 @@ final class ApiGuide
     /** 405 */
     public const string METHOD_NOT_ALLOWED = self::BASE.'method-not-allowed';
 
+    /** 401 */
+    public const string MFA_REQUIRED = self::BASE.'mfa-required';
+
+    /** 421 */
+    public const string MISDIRECTED_REQUEST = self::BASE.'misdirected-request';
+
+    /** 401 */
+    public const string MISSING_SIGNATURE = self::BASE.'missing-signature';
+
     /** 406 */
     public const string NOT_ACCEPTABLE = self::BASE.'not-acceptable';
 
     /** 501 */
     public const string NOT_IMPLEMENTED = self::BASE.'not-implemented';
+
+    /** 400 */
+    public const string OHTTP_KEY_NOT_ACCEPTABLE = self::BASE.'ohttp-key-not-acceptable';
 
     /** 413 */
     public const string PAYLOAD_TOO_LARGE = self::BASE.'payload-too-large';
@@ -109,6 +145,9 @@ final class ApiGuide
     /** 409 */
     public const string RESOURCE_CONFLICT = self::BASE.'resource-conflict';
 
+    /** 423 */
+    public const string RESOURCE_LOCKED = self::BASE.'resource-locked';
+
     /** 404 */
     public const string RESOURCE_NOT_FOUND = self::BASE.'resource-not-found';
 
@@ -118,8 +157,20 @@ final class ApiGuide
     /** 409 */
     public const string STALE_RESOURCE_VERSION = self::BASE.'stale-resource-version';
 
+    /** 403 */
+    public const string TENANT_SUSPENDED = self::BASE.'tenant-suspended';
+
+    /** 401 */
+    public const string TOKEN_REVOKED = self::BASE.'token-revoked';
+
+    /** 425 */
+    public const string TOO_EARLY = self::BASE.'too-early';
+
     /** 401 */
     public const string UNAUTHORIZED = self::BASE.'unauthorized';
+
+    /** 451 */
+    public const string UNAVAILABLE_FOR_LEGAL_REASONS = self::BASE.'unavailable-for-legal-reasons';
 
     /** 422 */
     public const string UNPROCESSABLE_QUERY = self::BASE.'unprocessable-query';
@@ -142,24 +193,36 @@ final class ApiGuide
     private const array TITLES = [
         self::ACCOUNT_FROZEN => 'Account Frozen',
         self::BAD_GATEWAY => 'Bad Gateway',
+        self::DATE_NOT_ACCEPTABLE => 'Date Not Acceptable',
         self::DIGEST_INVALID_VALUES => 'Invalid Digest Values',
         self::DIGEST_MISMATCHED_VALUES => 'Mismatched Digest Values',
         self::DIGEST_UNSUPPORTED_ALGORITHMS => 'Unsupported Hashing Algorithms',
+        self::ENDPOINT_SUNSET => 'Endpoint Sunset',
         self::EXPIRED_AUTHENTICATION_TOKEN => 'Expired Authentication Token',
+        self::FAILED_DEPENDENCY => 'Failed Dependency',
+        self::FEATURE_DISABLED => 'Feature Disabled',
         self::FORBIDDEN => 'Forbidden',
         self::GATEWAY_TIMEOUT => 'Gateway Timeout',
         self::GONE => 'Gone',
         self::IDEMPOTENCY_KEY_CONFLICT => 'Idempotency Key Conflict',
+        self::IDEMPOTENCY_KEY_MISSING => 'Idempotency Key Missing',
         self::INSUFFICIENT_FUNDS => 'Insufficient Funds',
         self::INSUFFICIENT_SCOPE => 'Insufficient Scope',
         self::INTERNAL_SERVER_ERROR => 'Internal Server Error',
+        self::INVALID_CREDENTIALS => 'Invalid Credentials',
         self::INVALID_PAGINATION_CURSOR => 'Invalid Pagination Cursor',
         self::INVALID_QUERY_PARAMETER => 'Invalid Query Parameter',
+        self::INVALID_SIGNATURE => 'Invalid Signature',
         self::LENGTH_REQUIRED => 'Length Required',
+        self::MAINTENANCE_MODE => 'Maintenance Mode',
         self::MALFORMED_REQUEST_BODY => 'Malformed Request Body',
         self::METHOD_NOT_ALLOWED => 'Method Not Allowed',
+        self::MFA_REQUIRED => 'MFA Required',
+        self::MISDIRECTED_REQUEST => 'Misdirected Request',
+        self::MISSING_SIGNATURE => 'Missing Signature',
         self::NOT_ACCEPTABLE => 'Not Acceptable',
         self::NOT_IMPLEMENTED => 'Not Implemented',
+        self::OHTTP_KEY_NOT_ACCEPTABLE => 'Oblivious HTTP Key Configuration Not Acceptable',
         self::PAYLOAD_TOO_LARGE => 'Payload Too Large',
         self::PRECONDITION_FAILED => 'Precondition Failed',
         self::PRECONDITION_REQUIRED => 'Precondition Required',
@@ -169,10 +232,15 @@ final class ApiGuide
         self::REQUEST_HEADER_FIELDS_TOO_LARGE => 'Request Header Fields Too Large',
         self::REQUEST_TIMEOUT => 'Request Timeout',
         self::RESOURCE_CONFLICT => 'Resource Conflict',
+        self::RESOURCE_LOCKED => 'Resource Locked',
         self::RESOURCE_NOT_FOUND => 'Resource Not Found',
         self::SERVICE_UNAVAILABLE => 'Service Unavailable',
         self::STALE_RESOURCE_VERSION => 'Stale Resource Version',
+        self::TENANT_SUSPENDED => 'Tenant Suspended',
+        self::TOKEN_REVOKED => 'Token Revoked',
+        self::TOO_EARLY => 'Too Early',
         self::UNAUTHORIZED => 'Unauthorized',
+        self::UNAVAILABLE_FOR_LEGAL_REASONS => 'Unavailable For Legal Reasons',
         self::UNPROCESSABLE_QUERY => 'Unprocessable Query',
         self::UNSUPPORTED_API_VERSION => 'Unsupported API Version',
         self::UNSUPPORTED_MEDIA_TYPE => 'Unsupported Media Type',
@@ -186,24 +254,36 @@ final class ApiGuide
     private const array STATUS_CODES = [
         self::ACCOUNT_FROZEN => 403,
         self::BAD_GATEWAY => 502,
+        self::DATE_NOT_ACCEPTABLE => 400,
         self::DIGEST_INVALID_VALUES => 400,
         self::DIGEST_MISMATCHED_VALUES => 400,
         self::DIGEST_UNSUPPORTED_ALGORITHMS => 400,
+        self::ENDPOINT_SUNSET => 410,
         self::EXPIRED_AUTHENTICATION_TOKEN => 401,
+        self::FAILED_DEPENDENCY => 424,
+        self::FEATURE_DISABLED => 403,
         self::FORBIDDEN => 403,
         self::GATEWAY_TIMEOUT => 504,
         self::GONE => 410,
         self::IDEMPOTENCY_KEY_CONFLICT => 422,
+        self::IDEMPOTENCY_KEY_MISSING => 400,
         self::INSUFFICIENT_FUNDS => 402,
         self::INSUFFICIENT_SCOPE => 403,
         self::INTERNAL_SERVER_ERROR => 500,
+        self::INVALID_CREDENTIALS => 401,
         self::INVALID_PAGINATION_CURSOR => 400,
         self::INVALID_QUERY_PARAMETER => 400,
+        self::INVALID_SIGNATURE => 401,
         self::LENGTH_REQUIRED => 411,
+        self::MAINTENANCE_MODE => 503,
         self::MALFORMED_REQUEST_BODY => 400,
         self::METHOD_NOT_ALLOWED => 405,
+        self::MFA_REQUIRED => 401,
+        self::MISDIRECTED_REQUEST => 421,
+        self::MISSING_SIGNATURE => 401,
         self::NOT_ACCEPTABLE => 406,
         self::NOT_IMPLEMENTED => 501,
+        self::OHTTP_KEY_NOT_ACCEPTABLE => 400,
         self::PAYLOAD_TOO_LARGE => 413,
         self::PRECONDITION_FAILED => 412,
         self::PRECONDITION_REQUIRED => 428,
@@ -213,10 +293,15 @@ final class ApiGuide
         self::REQUEST_HEADER_FIELDS_TOO_LARGE => 431,
         self::REQUEST_TIMEOUT => 408,
         self::RESOURCE_CONFLICT => 409,
+        self::RESOURCE_LOCKED => 423,
         self::RESOURCE_NOT_FOUND => 404,
         self::SERVICE_UNAVAILABLE => 503,
         self::STALE_RESOURCE_VERSION => 409,
+        self::TENANT_SUSPENDED => 403,
+        self::TOKEN_REVOKED => 401,
+        self::TOO_EARLY => 425,
         self::UNAUTHORIZED => 401,
+        self::UNAVAILABLE_FOR_LEGAL_REASONS => 451,
         self::UNPROCESSABLE_QUERY => 422,
         self::UNSUPPORTED_API_VERSION => 400,
         self::UNSUPPORTED_MEDIA_TYPE => 415,
@@ -244,9 +329,14 @@ final class ApiGuide
         414 => self::URI_TOO_LONG,
         415 => self::UNSUPPORTED_MEDIA_TYPE,
         416 => self::RANGE_NOT_SATISFIABLE,
+        421 => self::MISDIRECTED_REQUEST,
+        423 => self::RESOURCE_LOCKED,
+        424 => self::FAILED_DEPENDENCY,
+        425 => self::TOO_EARLY,
         428 => self::PRECONDITION_REQUIRED,
         429 => self::RATE_LIMIT_EXCEEDED,
         431 => self::REQUEST_HEADER_FIELDS_TOO_LARGE,
+        451 => self::UNAVAILABLE_FOR_LEGAL_REASONS,
         500 => self::INTERNAL_SERVER_ERROR,
         501 => self::NOT_IMPLEMENTED,
         502 => self::BAD_GATEWAY,
