@@ -390,6 +390,22 @@ Link: <https://docs.example.com/sunset-policy>; rel="sunset"
 - Error responses get the headers too, because both describe the resource, not the outcome of
   one request.
 
+A URI's query is part of what identifies the resource (RFC 3986 section 3), so a query form of a
+route is a resource of its own, and can be deprecated while the route is not. Give the attributes
+the query parameter, and they apply only to requests that carry it:
+
+```php
+#[Deprecation(at: '2026-10-29T00:00:00Z', link: 'https://docs.example.com/deprecations/contact-filter', query: 'organization_id')]
+#[Sunset(at: '2027-01-31T23:59:59Z', query: 'organization_id')]
+final class ListContactsController
+{
+    // GET /contacts?organization_id=... is deprecated; GET /contacts is not.
+}
+```
+
+Both attributes are repeatable, so one controller can carry a notice for itself and another for a
+query form. A notice for a query form the request carries wins over one without a query.
+
 The attributes are named after the header fields because `#[Deprecated]` is taken: PHP 8.4's
 native `#[\Deprecated]` raises `E_USER_DEPRECATED` every time the method is called, which on a
 controller means on every request.

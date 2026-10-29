@@ -21,6 +21,7 @@ final class OrderController
 - Only controller routes are read. Closure routes are not, because `route:cache` breaks their attributes. Move a closure route to a controller to deprecate it.
 - A date without an offset is UTC. A deprecation date can be in the future. A sunset earlier than the deprecation throws.
 - `#[Deprecation(link: ...)]` with no date publishes a deprecation policy only.
+- To retire a query form of a route, such as `/contacts?organization_id=...`, while the route stays, pass `query: 'organization_id'` to both attributes. They are repeatable, and the query form's notice wins when the request carries the parameter. A field has no header: deprecate it in the OpenAPI document instead.
 - With the `global` option on (the default), nothing is added to routes. With it off, add the `deprecation` middleware.
 - Reading deprecations from elsewhere, such as a manifest: bind `JustSteveKing\Toolbox\Deprecation\Contracts\DeprecationSource`, which returns a `JustSteveKing\Toolbox\Deprecation\Notice` for a route.
 

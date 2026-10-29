@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JustSteveKing\Toolbox\Deprecation;
 
+use Illuminate\Container\Container;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use JustSteveKing\Toolbox\Deprecation\Attributes\Deprecation;
 use JustSteveKing\Toolbox\Deprecation\Attributes\Sunset;
@@ -15,7 +17,9 @@ use ReflectionMethod;
  * Reads #[Deprecation] and #[Sunset] from a route's controller and action.
  *
  * An attribute on the action wins over the same attribute on the controller; the two kinds are
- * resolved separately, so a controller-wide Sunset can sit beside a per-action Deprecation.
+ * resolved separately, so a controller-wide Sunset can sit beside a per-action Deprecation. An
+ * attribute with a query applies only when the request carries that query parameter, and wins
+ * over one without.
  *
  * Only controller routes are read, as with Laravel's own #[Middleware] controller attributes.
  * Closure routes are not, because `route:cache` serialises closures and their attributes cannot
@@ -24,7 +28,9 @@ use ReflectionMethod;
 final class AttributeSource implements DeprecationSource
 {
     /**
-     * @var array<string, Notice|null>
+     * The attributes on each action, read once, by kind; the notice itself depends on the request.
+     *
+     * @var array<string, array{deprecation: list<Deprecation>, sunset: list<Sunset>}>
      */
     private array $resolved = [];
 
@@ -43,21 +49,22 @@ final class AttributeSource implements DeprecationSource
         $key = $class.'@'.$method;
 
         if (! array_key_exists($key, $this->resolved)) {
-            $this->resolved[$key] = $this->read(new ReflectionClass($class), $method);
+            $reflection = new ReflectionClass($class);
+            $action = $reflection->hasMethod($method) ? $reflection->getMethod($method) : null;
+
+            $this->resolved[$key] = [
+                'deprecation' => $this->attributes(Deprecation::class, $reflection, $action),
+                'sunset' => $this->attributes(Sunset::class, $reflection, $action),
+            ];
         }
 
-        return $this->resolved[$key];
-    }
+        // Read when asked rather than held: this source is a singleton, and under Octane one
+        // instance serves many requests.
+        $request = Container::getInstance()->bound('request') ? Container::getInstance()->make('request') : null;
+        $parameters = $request instanceof Request ? array_map(strval(...), $request->query->keys()) : [];
 
-    /**
-     * @param  ReflectionClass<object>  $class
-     */
-    private function read(ReflectionClass $class, string $method): ?Notice
-    {
-        $action = $class->hasMethod($method) ? $class->getMethod($method) : null;
-
-        $deprecation = $this->attribute(Deprecation::class, $class, $action);
-        $sunset = $this->attribute(Sunset::class, $class, $action);
+        $deprecation = $this->choose($this->resolved[$key]['deprecation'], $parameters);
+        $sunset = $this->choose($this->resolved[$key]['sunset'], $parameters);
 
         if ($deprecation === null && $sunset === null) {
             return null;
@@ -72,22 +79,52 @@ final class AttributeSource implements DeprecationSource
     }
 
     /**
-     * @template T of object
+     * The attribute that applies to this request: one scoped to a query parameter the request
+     * carries, or else one for the route itself. Attributes come action first, so within each of
+     * those an action's attribute wins over its controller's.
      *
-     * @param  class-string<T>  $attribute
-     * @param  ReflectionClass<object>  $class
+     * @template T of Deprecation|Sunset
+     *
+     * @param  list<T>  $attributes
+     * @param  list<string>  $parameters  the query parameters the request carries
      * @return T|null
      */
-    private function attribute(string $attribute, ReflectionClass $class, ?ReflectionMethod $action): ?object
+    private function choose(array $attributes, array $parameters): ?object
     {
-        foreach ([$action, $class] as $target) {
-            $found = $target?->getAttributes($attribute) ?? [];
+        foreach ($attributes as $attribute) {
+            if ($attribute->query !== null && in_array($attribute->query, $parameters, true)) {
+                return $attribute;
+            }
+        }
 
-            if ($found !== []) {
-                return $found[0]->newInstance();
+        foreach ($attributes as $attribute) {
+            if ($attribute->query === null) {
+                return $attribute;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Every attribute of a kind, the action's before its controller's.
+     *
+     * @template T of object
+     *
+     * @param  class-string<T>  $attribute
+     * @param  ReflectionClass<object>  $class
+     * @return list<T>
+     */
+    private function attributes(string $attribute, ReflectionClass $class, ?ReflectionMethod $action): array
+    {
+        $found = [];
+
+        foreach ([$action, $class] as $target) {
+            foreach ($target?->getAttributes($attribute) ?? [] as $reflected) {
+                $found[] = $reflected->newInstance();
+            }
+        }
+
+        return $found;
     }
 }
