@@ -101,3 +101,4 @@ public function handle(CurrentOperation $operation): void
 - The monitor answers 200 with the status while the job is pending or running, 303 to the result when it has succeeded, 200 with an `error` problem when it has failed, and 404 for an unknown operation or one started by someone else.
 - Status lives in the cache for `ttl` seconds (default 86400).
 - The monitor route runs behind the `middleware` option (default `['api']`). Add your auth middleware there if operations must be private.
+- To document the monitor with your own controller (Scribe attributes and the like), set `'route' => false` and register a route named `Operations::ROUTE` whose controller returns `ShowOperation`'s answer. Every 202's `Location` is built from that name.

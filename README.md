@@ -855,6 +855,34 @@ public function handle(CurrentOperation $operation): void
   can lose a status early; the monitor then answers 404.
 - A job that times out or is failed manually, without throwing, stays `running` until its TTL.
 
+### Registering the monitor yourself
+
+The monitor route is registered for you. To document it with the rest of your API, for example
+with Scribe attributes on a controller of your own, turn that off and register it yourself, under
+the name every 202's `Location` is built from:
+
+```php
+Features::asyncOperations(['route' => false]),
+```
+
+```php
+use JustSteveKing\Toolbox\AsyncOperations\Http\ShowOperation;
+use JustSteveKing\Toolbox\AsyncOperations\Operations;
+
+Route::get('/v1/operations/{operation}', ShowOperationController::class)
+    ->middleware(['auth:sanctum'])
+    ->name(Operations::ROUTE);
+
+final class ShowOperationController
+{
+    // Your documentation attributes here; the answer is the package's.
+    public function __invoke(Request $request, string $operation, ShowOperation $monitor)
+    {
+        return $monitor($request, $operation);
+    }
+}
+```
+
 ## Merge Patch
 
 [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396)
@@ -1361,6 +1389,7 @@ Every option, with its default. Options are passed inline to the feature's metho
 | | `ttl` | `86400` | Seconds a status is kept after its last change |
 | | `retry_after` | `5` | `Retry-After` seconds while an operation runs |
 | | `store` | default store | Cache store for statuses |
+| | `route` | `true` | `false` to register the monitor route yourself, named `Operations::ROUTE` |
 | `mergePatch` | | | No options. Opt in per route with `merge-patch` |
 | `digests` | | | No options. Opt in per route with `digest.verify` and `digest.respond` |
 | `messageSignatures` | `keys` | `[]` | Keys by keyid: `algorithm`, and `secret`, `private_key` or `public_key` |

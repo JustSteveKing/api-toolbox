@@ -22,6 +22,7 @@
             <directory>tests/Disabled</directory>
             <directory>tests/Override</directory>
             <directory>tests/Options</directory>
+            <directory>tests/AppMonitorRoute</directory>
             <directory>tests/Production</directory>
             <directory>tests/Signatures</directory>
         </testsuite>
