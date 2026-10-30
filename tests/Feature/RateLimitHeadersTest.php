@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Route;
 use JustSteveKing\Toolbox\RateLimitHeaders\Http\Middleware\ThrottleRequestsWithRateLimitHeaders;
 
 beforeEach(function (): void {
+    // The limiter counts whole seconds, so a test whose requests straddle a second boundary saw
+    // t=59 or Retry-After: 59 where it asserted 60. Frozen, every request lands in one second;
+    // travel() still moves the clock where a test needs it to.
+    $this->freezeTime();
+
     RateLimiter::for('api', fn (Request $request) => Limit::perMinute(3)->by($request->ip()));
     RateLimiter::for('layered', fn (Request $request) => [
         Limit::perMinute(10)->by('minute:'.$request->ip()),
